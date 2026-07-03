@@ -1,0 +1,14 @@
+[project]
+name = "kaggle-solution"
+version = "0.1.0"
+description = "Collect, summarize, translate, and archive ranked Kaggle solutions"
+requires-python = ">=3.11"
+dependencies = [
+    "beautifulsoup4>=4.15.0",
+    "jinja2>=3.1.6",
+    "kaggle>=2.2.3",
+    "markdown-it-py>=4.2.0",
+    "pypdf>=6.14.2",
+    "requests>=2.32.5",
+    "weasyprint>=69.0",
+]
