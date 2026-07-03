@@ -60,6 +60,12 @@ Review `.work/leaderboard.json` and every item in `.work/topics.json`. Match fir
 - Mark unresolved ranks `not_found` and continue.
 - Do not infer missing solutions from third-party posts.
 
+Validate the edited manifest and fix every reported failure before continuing:
+
+```bash
+uv run python "$PIPELINE" check-manifest <competition>
+```
+
 ### 4. Fetch selected posts and all comments
 
 ```bash
@@ -100,6 +106,7 @@ uv run python "$PIPELINE" verify <competition>
 
 Do not report completion until verification passes. Confirm:
 
+- The manifest passes all consistency checks.
 - `summary.md` exists.
 - Each selected Discussion has one original and one Japanese PDF.
 - PDFs have pages and extractable text.

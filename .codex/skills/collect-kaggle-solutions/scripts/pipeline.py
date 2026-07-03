@@ -111,6 +111,11 @@ def write_json(path: Path, value) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def compact_text(value: str) -> str:
+    """Collapse whitespace so names wrapped across PDF lines still match."""
+    return re.sub(r"\s+", "", value)
+
+
 def normalize_competition(value: str) -> str:
     value = value.strip()
     match = re.fullmatch(
@@ -334,6 +339,152 @@ def init_manifest(args: argparse.Namespace) -> None:
     print(f"Created {target['manifest'].relative_to(project_root)}")
 
 
+REQUIRED_DISCUSSION_FIELDS = (
+    "rank",
+    "team",
+    "topic_id",
+    "slug",
+    "match_evidence",
+    "selected_comment_ids",
+)
+
+
+def manifest_failures(manifest: dict) -> list[str]:
+    failures: list[str] = []
+    max_rank = manifest.get("max_rank")
+    if not isinstance(max_rank, int) or max_rank < 1:
+        failures.append(f"max_rank must be a positive integer, got {max_rank!r}")
+        max_rank = 0
+
+    rank_numbers: list[int] = []
+    rank_by_number: dict[int, dict] = {}
+    for entry in manifest.get("ranks", []):
+        number = entry.get("rank")
+        if not isinstance(number, int):
+            failures.append(f"rank entry has a non-integer rank: {number!r}")
+            continue
+        rank_numbers.append(number)
+        if number in rank_by_number:
+            failures.append(f"duplicate rank entry: {number}")
+        else:
+            rank_by_number[number] = entry
+    if rank_numbers != sorted(rank_numbers):
+        failures.append("rank entries are not sorted numerically")
+    missing_ranks = [n for n in range(1, max_rank + 1) if n not in rank_by_number]
+    if missing_ranks:
+        failures.append(f"missing rank entries: {missing_ranks}")
+    outside = sorted(n for n in rank_by_number if not 1 <= n <= max_rank)
+    if outside:
+        failures.append(f"rank entries outside 1..{max_rank}: {outside}")
+
+    rank_topic_owner: dict[int, int] = {}
+    for number, entry in sorted(rank_by_number.items()):
+        status = entry.get("status")
+        topic_ids = entry.get("topic_ids")
+        if not isinstance(topic_ids, list) or not all(
+            isinstance(topic_id, int) for topic_id in topic_ids
+        ):
+            failures.append(f"rank {number} topic_ids must be a list of integers")
+            topic_ids = []
+        if status not in {"found", "not_found"}:
+            failures.append(
+                f"rank {number} has unresolved status {status!r}; "
+                "finish the review with found or not_found"
+            )
+        if status == "found" and not topic_ids:
+            failures.append(f"rank {number} is found but lists no topic_ids")
+        if status == "not_found" and topic_ids:
+            failures.append(f"rank {number} is not_found but lists topic_ids {topic_ids}")
+        if len(set(topic_ids)) != len(topic_ids):
+            failures.append(f"rank {number} lists duplicate topic_ids")
+        for topic_id in topic_ids:
+            if topic_id in rank_topic_owner and rank_topic_owner[topic_id] != number:
+                failures.append(
+                    f"topic {topic_id} is assigned to ranks "
+                    f"{rank_topic_owner[topic_id]} and {number}"
+                )
+            rank_topic_owner.setdefault(topic_id, number)
+
+    discussion_keys: list[tuple[int, int]] = []
+    discussion_topics_by_rank: dict[int, set[int]] = {}
+    for index, discussion in enumerate(manifest.get("discussions", [])):
+        label = f"discussion #{index + 1}"
+        missing_fields = [
+            field for field in REQUIRED_DISCUSSION_FIELDS if field not in discussion
+        ]
+        if missing_fields:
+            failures.append(f"{label} is missing fields: {', '.join(missing_fields)}")
+            continue
+        number = discussion["rank"]
+        topic_id = discussion["topic_id"]
+        if not isinstance(number, int) or not isinstance(topic_id, int):
+            failures.append(f"{label} rank and topic_id must be integers")
+            continue
+        label = f"discussion rank {number} topic {topic_id}"
+        if topic_id in discussion_topics_by_rank.get(number, set()):
+            failures.append(f"{label} appears more than once")
+        discussion_keys.append((number, topic_id))
+        discussion_topics_by_rank.setdefault(number, set()).add(topic_id)
+        entry = rank_by_number.get(number)
+        if entry is None:
+            failures.append(f"{label} has no matching rank entry")
+        else:
+            if discussion["team"] != entry.get("team"):
+                failures.append(
+                    f"{label} team {discussion['team']!r} does not match "
+                    f"leaderboard team {entry.get('team')!r}"
+                )
+            if topic_id not in (entry.get("topic_ids") or []):
+                failures.append(f"{label} is missing from the rank entry's topic_ids")
+        slug = discussion["slug"]
+        if not isinstance(slug, str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", slug):
+            failures.append(
+                f"{label} slug must be lowercase ASCII letters, digits, and hyphens"
+            )
+        evidence = discussion["match_evidence"]
+        if not isinstance(evidence, str) or not evidence.strip():
+            failures.append(f"{label} match_evidence must explain the rank-to-post match")
+        selected = discussion["selected_comment_ids"]
+        if not isinstance(selected, list) or not all(
+            isinstance(value, int) for value in selected
+        ):
+            failures.append(f"{label} selected_comment_ids must be a list of integers")
+        elif len(set(selected)) != len(selected):
+            failures.append(f"{label} selected_comment_ids contains duplicates")
+    if discussion_keys != sorted(discussion_keys):
+        failures.append("discussions are not sorted by rank, then topic ID")
+
+    for number, entry in sorted(rank_by_number.items()):
+        topic_ids = entry.get("topic_ids")
+        if not isinstance(topic_ids, list):
+            continue
+        for topic_id in topic_ids:
+            if isinstance(topic_id, int) and topic_id not in discussion_topics_by_rank.get(
+                number, set()
+            ):
+                failures.append(
+                    f"rank {number} lists topic {topic_id} without a matching discussion entry"
+                )
+    return failures
+
+
+def check_manifest(args: argparse.Namespace) -> None:
+    slug = normalize_competition(args.competition)
+    project_root = Path(args.project_root).resolve()
+    target = paths(project_root, slug)
+    manifest = read_json(target["manifest"])
+    failures = manifest_failures(manifest)
+    if failures:
+        raise RuntimeError("Manifest check failed:\n" + "\n".join(failures))
+    found = sum(
+        1 for entry in manifest.get("ranks", []) if entry.get("status") == "found"
+    )
+    print(
+        f"Manifest OK: {len(manifest.get('ranks', []))} ranks ({found} found), "
+        f"{len(manifest.get('discussions', []))} discussions"
+    )
+
+
 def fetch_topic(slug: str, topic_id: int) -> dict:
     messages, _ = run_kaggle_json(
         "competitions",
@@ -388,6 +539,12 @@ def fetch(args: argparse.Namespace) -> None:
     project_root = Path(args.project_root).resolve()
     target = paths(project_root, slug)
     manifest = read_json(target["manifest"])
+    failures = manifest_failures(manifest)
+    if failures:
+        raise RuntimeError(
+            "Manifest check failed; fix .work/manifest.json first:\n"
+            + "\n".join(failures)
+        )
     discussions = manifest.get("discussions", [])
     if not discussions:
         raise RuntimeError(
@@ -574,7 +731,7 @@ def verify(args: argparse.Namespace) -> None:
     project_root = Path(args.project_root).resolve()
     target = paths(project_root, slug)
     manifest = read_json(target["manifest"])
-    failures: list[str] = []
+    failures: list[str] = manifest_failures(manifest)
     rows: list[dict] = []
     if not target["summary"].exists():
         failures.append(f"missing summary: {target['summary'].relative_to(project_root)}")
@@ -602,6 +759,7 @@ def verify(args: argparse.Namespace) -> None:
                 )
             else:
                 translation = translation_path.read_text(encoding="utf-8")
+                compact_translation = compact_text(translation)
                 if "補足Q&A" not in translation:
                     failures.append(
                         f"supplemental Q&A missing from translation: "
@@ -609,7 +767,7 @@ def verify(args: argparse.Namespace) -> None:
                     )
                 for comment in selected_comments:
                     author = str(comment.get("authorName", "")).strip()
-                    if author and author not in translation:
+                    if author and compact_text(author) not in compact_translation:
                         failures.append(
                             f"Q&A speaker {author!r} missing from translation: "
                             f"{translation_path.relative_to(project_root)}"
@@ -622,15 +780,16 @@ def verify(args: argparse.Namespace) -> None:
             reader = PdfReader(pdf_path)
             text = "\n".join(page.extract_text() or "" for page in reader.pages)
             text = text.replace("\x00", "")
+            compact_pdf = compact_text(text)
             if not text.strip():
                 failures.append(f"no extractable text: {pdf_path.relative_to(project_root)}")
-            if str(discussion["team"]) not in text:
+            if compact_text(str(discussion["team"])) not in compact_pdf:
                 failures.append(f"team missing from PDF: {pdf_path.relative_to(project_root)}")
             if language == "ja" and not re.search(r"[ぁ-んァ-ヶ一-龯]", text):
                 failures.append(f"Japanese text missing: {pdf_path.relative_to(project_root)}")
             for comment in selected_comments:
                 author = str(comment.get("authorName", "")).strip()
-                if author and author not in text:
+                if author and compact_text(author) not in compact_pdf:
                     failures.append(
                         f"Q&A speaker {author!r} missing from PDF: "
                         f"{pdf_path.relative_to(project_root)}"
@@ -714,6 +873,10 @@ def build_parser() -> argparse.ArgumentParser:
     manifest_parser.add_argument("competition")
     manifest_parser.add_argument("--overwrite", action="store_true")
     manifest_parser.set_defaults(handler=init_manifest)
+
+    check_parser = subparsers.add_parser("check-manifest")
+    check_parser.add_argument("competition")
+    check_parser.set_defaults(handler=check_manifest)
 
     fetch_parser = subparsers.add_parser("fetch")
     fetch_parser.add_argument("competition")

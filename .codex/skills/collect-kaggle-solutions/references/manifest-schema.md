@@ -1,6 +1,6 @@
 # Manifest schema
 
-Create the initial manifest with `pipeline.py init-manifest`. Then edit `.work/manifest.json` after reviewing the leaderboard and discussion list.
+Create the initial manifest with `pipeline.py init-manifest`. Then edit `.work/manifest.json` after reviewing the leaderboard and discussion list. Validate the result with `pipeline.py check-manifest`; `fetch` and `verify` enforce the same rules and refuse an inconsistent manifest.
 
 ## Rank entries
 
