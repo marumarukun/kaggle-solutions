@@ -59,7 +59,7 @@ Append retained exchanges under `Supplemental Q&A` in each PDF. Preserve the ori
 - Japanese PDF: a faithful Japanese translation of the same selected content.
 - Do not replace a PDF translation with a summary.
 - Preserve code, URLs, model names, identifiers, formulas, tables, and numerical values.
-- Perform translation directly with Codex. Do not call an external translation API.
+- Perform translation directly as the running agent. Do not call an external translation API.
 
 ## Summary use of Q&A
 

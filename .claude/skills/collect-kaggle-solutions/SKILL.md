@@ -12,7 +12,7 @@ Run the complete workflow from a Kaggle competition slug or URL and a positive `
 - Require `uv`, the project environment, a working Kaggle CLI login, and network access to Kaggle.
 - Use Kaggle CLI as the only competition discovery and content acquisition source.
 - Do not use web search to fill missing solution posts.
-- Translate directly with Codex. Do not call an external translation API.
+- Translate directly as the running agent. Do not call an external translation API.
 - Preserve existing artifacts unless the user explicitly requests refresh or overwrite.
 
 ## Read the policies
@@ -29,7 +29,7 @@ Read these files before selecting or writing content:
 Set the script path once:
 
 ```bash
-PIPELINE=.codex/skills/collect-kaggle-solutions/scripts/pipeline.py
+PIPELINE=.claude/skills/collect-kaggle-solutions/scripts/pipeline.py
 ```
 
 ### 1. Inspect resumable state
