@@ -48,6 +48,8 @@ uv run python "$PIPELINE" collect <competition> --max-rank <max_rank>
 
 This collects competition metadata, pages, the official final leaderboard, and every Discussion-list page exposed by Kaggle CLI. Stop for user input if the competition, authentication, or leaderboard cannot be established.
 
+The collector validates leaderboard rows before assigning ranks. It quarantines rows whose team name looks like a submission filename, saves every retrieved CLI row to `.work/leaderboard-raw.json`, records exclusions in `.work/leaderboard-anomalies.json`, fetches replacement rows, and only then assigns ranks `1..max_rank`. If any anomaly is reported, review both files and confirm that `.work/leaderboard.json` starts with the actual winning team before continuing.
+
 ### 3. Build the solution manifest
 
 ```bash
@@ -65,6 +67,8 @@ Validate the edited manifest and fix every reported failure before continuing:
 ```bash
 uv run python "$PIPELINE" check-manifest <competition>
 ```
+
+This check also compares every manifest rank, team name, and private score with the validated leaderboard. Do not rename PDFs or translations to work around a mismatch; correct the leaderboard/manifest mapping and regenerate affected artifacts.
 
 ### 4. Fetch selected posts and all comments
 
@@ -116,3 +120,18 @@ Do not report completion until verification passes. Confirm:
 ## Completion report
 
 Report the number of targeted ranks, found teams, solution posts, original PDFs, Japanese PDFs, and qualifying Q&A chains. List unresolved ranks without implying that no solution exists. Link the final summary and both PDF directories.
+
+## Troubleshooting
+
+### A filename appears as a leaderboard team
+
+Treat it as contaminated leaderboard data, not as a real final rank. Review `.work/leaderboard-raw.json` and `.work/leaderboard-anomalies.json`. Continue only when `leaderboard.json` contains exactly ranks `1..max_rank` and rank 1 is the actual winning team. If the row is not detected automatically, stop before `init-manifest`, document the evidence, and extend `leaderboard_anomaly_reasons()` conservatively.
+
+### Existing PDF filenames disagree with the validated leaderboard
+
+Do not only rename the PDFs. Correct the manifest, translations, summary, and all rank-bearing PDF contents, regenerate the PDFs with `--overwrite`, and run `verify`.
+
+## Examples
+
+- `uv run python "$PIPELINE" collect rsna-intracranial-aneurysm-detection --max-rank 11` quarantines a row such as `perfect_submission.parquet`, obtains the next valid team, and writes validated ranks 1 through 11.
+- `uv run python "$PIPELINE" check-manifest <competition>` fails when a manifest team or score is shifted relative to `leaderboard.json`.

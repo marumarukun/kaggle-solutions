@@ -181,6 +181,8 @@ def paths(project_root: Path, slug: str) -> dict[str, Path]:
         "work": work,
         "competition": work / "competition.json",
         "leaderboard": work / "leaderboard.json",
+        "leaderboard_raw": work / "leaderboard-raw.json",
+        "leaderboard_anomalies": work / "leaderboard-anomalies.json",
         "topics": work / "topics.json",
         "manifest": work / "manifest.json",
         "raw": work / "raw",
@@ -193,9 +195,97 @@ def paths(project_root: Path, slug: str) -> dict[str, Path]:
     }
 
 
-def collect_leaderboard(slug: str, max_rank: int) -> list[dict]:
+SUBMISSION_FILE_EXTENSIONS = (
+    "arrow",
+    "csv",
+    "feather",
+    "gz",
+    "json",
+    "jsonl",
+    "parquet",
+    "tsv",
+    "xlsx",
+    "zip",
+)
+
+
+def leaderboard_anomaly_reasons(row: dict) -> list[str]:
+    """Return reasons why a leaderboard row is not a plausible ranked team."""
+    reasons: list[str] = []
+    raw_team_name = row.get("teamName")
+    team_name = str(raw_team_name).strip() if raw_team_name is not None else ""
+    if not team_name:
+        reasons.append("teamName is empty")
+    extension_pattern = "|".join(re.escape(value) for value in SUBMISSION_FILE_EXTENSIONS)
+    if re.search(rf"\.(?:{extension_pattern})$", team_name, re.IGNORECASE):
+        reasons.append("teamName looks like a submission filename")
+    return reasons
+
+
+def leaderboard_failures(rows: object, max_rank: int) -> list[str]:
+    failures: list[str] = []
+    if not isinstance(rows, list):
+        return ["leaderboard must be a JSON list"]
+    if len(rows) != max_rank:
+        failures.append(
+            f"leaderboard has {len(rows)} rows; expected exactly {max_rank}"
+        )
+    expected_ranks = list(range(1, max_rank + 1))
+    actual_ranks = [row.get("rank") for row in rows if isinstance(row, dict)]
+    if actual_ranks != expected_ranks:
+        failures.append(
+            f"leaderboard ranks are {actual_ranks}; expected {expected_ranks}"
+        )
+    team_ids: list[object] = []
+    for position, row in enumerate(rows, start=1):
+        if not isinstance(row, dict):
+            failures.append(f"leaderboard row {position} is not an object")
+            continue
+        reasons = leaderboard_anomaly_reasons(row)
+        if reasons:
+            failures.append(
+                f"leaderboard rank {position} is suspicious: {', '.join(reasons)}"
+            )
+        team_id = row.get("teamId")
+        if team_id is not None:
+            if team_id in team_ids:
+                failures.append(f"leaderboard teamId {team_id!r} appears more than once")
+            team_ids.append(team_id)
+    return failures
+
+
+def manifest_leaderboard_failures(manifest: dict, leaderboard: list[dict]) -> list[str]:
+    failures: list[str] = []
+    leaderboard_by_rank = {row.get("rank"): row for row in leaderboard}
+    for entry in manifest.get("ranks", []):
+        number = entry.get("rank")
+        source = leaderboard_by_rank.get(number)
+        if source is None:
+            failures.append(f"manifest rank {number!r} has no leaderboard row")
+            continue
+        expected_team = source.get("teamName", "")
+        expected_score = source.get("score", "")
+        if entry.get("team") != expected_team:
+            failures.append(
+                f"manifest rank {number} team {entry.get('team')!r} does not match "
+                f"leaderboard team {expected_team!r}"
+            )
+        if entry.get("private_score") != expected_score:
+            failures.append(
+                f"manifest rank {number} score {entry.get('private_score')!r} does not "
+                f"match leaderboard score {expected_score!r}"
+            )
+    return failures
+
+
+def collect_leaderboard(
+    slug: str, max_rank: int
+) -> tuple[list[dict], list[dict], list[dict]]:
     rows: list[dict] = []
+    raw_rows: list[dict] = []
+    anomalies: list[dict] = []
     token: str | None = None
+    seen_tokens: set[str] = set()
     while len(rows) < max_rank:
         page_size = min(200, max_rank - len(rows))
         args = [
@@ -211,18 +301,44 @@ def collect_leaderboard(slug: str, max_rank: int) -> list[dict]:
         page, stderr = run_kaggle_json(*args)
         if not isinstance(page, list) or not page:
             break
-        rows.extend(page)
+        for row in page:
+            if not isinstance(row, dict):
+                anomalies.append(
+                    {
+                        "source_position": len(raw_rows) + 1,
+                        "row": row,
+                        "reasons": ["row is not a JSON object"],
+                    }
+                )
+                continue
+            source_row = {**row, "source_position": len(raw_rows) + 1}
+            raw_rows.append(source_row)
+            reasons = leaderboard_anomaly_reasons(row)
+            if reasons:
+                anomalies.append({**source_row, "reasons": reasons})
+            else:
+                rows.append(source_row)
+                if len(rows) == max_rank:
+                    break
         token = next_page_token(stderr)
         if not token:
             break
+        if token in seen_tokens:
+            raise RuntimeError("Leaderboard pagination repeated a page token")
+        seen_tokens.add(token)
     if len(rows) < max_rank:
         raise RuntimeError(
-            f"Official leaderboard returned only {len(rows)} rows; requested rank {max_rank}."
+            f"Official leaderboard returned only {len(rows)} plausible team rows; "
+            f"requested rank {max_rank}. Review leaderboard-anomalies.json."
         )
-    return [
-        {"rank": rank, **row}
+    ranked_rows = [
+        {**row, "rank": rank}
         for rank, row in enumerate(rows[:max_rank], start=1)
     ]
+    failures = leaderboard_failures(ranked_rows, max_rank)
+    if failures:
+        raise RuntimeError("Leaderboard validation failed:\n" + "\n".join(failures))
+    return ranked_rows, raw_rows, anomalies
 
 
 def collect_topics(slug: str) -> list[dict]:
@@ -274,7 +390,9 @@ def collect(args: argparse.Namespace) -> None:
     pages_data, _ = run_kaggle_json(
         "competitions", "pages", slug, "--content"
     )
-    leaderboard = collect_leaderboard(slug, args.max_rank)
+    leaderboard, raw_leaderboard, leaderboard_anomalies = collect_leaderboard(
+        slug, args.max_rank
+    )
     topics = collect_topics(slug)
     candidate_pattern = re.compile(
         r"\b(solution|write[ -]?up|place|gold|approach)\b", re.IGNORECASE
@@ -291,10 +409,13 @@ def collect(args: argparse.Namespace) -> None:
             "url": f"https://www.kaggle.com/competitions/{slug}",
             "max_rank": args.max_rank,
             "retrieved_at": now_iso(),
+            "leaderboard_anomaly_count": len(leaderboard_anomalies),
             "metadata": exact[0],
             "pages": pages_data,
         },
     )
+    write_json(target["leaderboard_raw"], raw_leaderboard)
+    write_json(target["leaderboard_anomalies"], leaderboard_anomalies)
     write_json(target["leaderboard"], leaderboard)
     write_json(
         target["topics"],
@@ -305,6 +426,11 @@ def collect(args: argparse.Namespace) -> None:
         },
     )
     print(f"Collected {len(leaderboard)} leaderboard rows and {len(topics)} topics")
+    if leaderboard_anomalies:
+        print(
+            f"WARNING: excluded {len(leaderboard_anomalies)} suspicious leaderboard "
+            f"row(s); review {target['leaderboard_anomalies'].relative_to(project_root)}"
+        )
     print(f"Work directory: {target['work'].relative_to(project_root)}")
 
 
@@ -318,6 +444,9 @@ def init_manifest(args: argparse.Namespace) -> None:
         )
     competition = read_json(target["competition"])
     leaderboard = read_json(target["leaderboard"])
+    failures = leaderboard_failures(leaderboard, competition["max_rank"])
+    if failures:
+        raise RuntimeError("Leaderboard validation failed:\n" + "\n".join(failures))
     manifest = {
         "competition": slug,
         "competition_url": competition["url"],
@@ -474,6 +603,9 @@ def check_manifest(args: argparse.Namespace) -> None:
     target = paths(project_root, slug)
     manifest = read_json(target["manifest"])
     failures = manifest_failures(manifest)
+    leaderboard = read_json(target["leaderboard"])
+    failures.extend(leaderboard_failures(leaderboard, manifest.get("max_rank", 0)))
+    failures.extend(manifest_leaderboard_failures(manifest, leaderboard))
     if failures:
         raise RuntimeError("Manifest check failed:\n" + "\n".join(failures))
     found = sum(
@@ -732,6 +864,9 @@ def verify(args: argparse.Namespace) -> None:
     target = paths(project_root, slug)
     manifest = read_json(target["manifest"])
     failures: list[str] = manifest_failures(manifest)
+    leaderboard = read_json(target["leaderboard"])
+    failures.extend(leaderboard_failures(leaderboard, manifest.get("max_rank", 0)))
+    failures.extend(manifest_leaderboard_failures(manifest, leaderboard))
     rows: list[dict] = []
     if not target["summary"].exists():
         failures.append(f"missing summary: {target['summary'].relative_to(project_root)}")

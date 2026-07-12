@@ -47,6 +47,7 @@ Required fields:
 
 ## Consistency rules
 
+- Every rank entry's `rank`, `team`, and `private_score` must exactly match the validated `.work/leaderboard.json`; `check-manifest` enforces this mapping.
 - Every discussion topic ID must also appear in the matching rank entry's `topic_ids`.
 - Do not assign one topic to multiple ranks.
 - Keep complementary posts from one team as separate discussion entries.

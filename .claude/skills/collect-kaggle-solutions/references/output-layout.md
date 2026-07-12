@@ -12,6 +12,8 @@ outputs/<competition-slug>/
 │       └── rank-<rank>-<slug>-<topic-id>-ja.pdf
 └── .work/
     ├── competition.json
+    ├── leaderboard-raw.json
+    ├── leaderboard-anomalies.json
     ├── leaderboard.json
     ├── topics.json
     ├── manifest.json
@@ -22,6 +24,8 @@ outputs/<competition-slug>/
     ├── html/
     └── verification/
 ```
+
+`leaderboard-raw.json` preserves every retrieved CLI row in retrieval order. `leaderboard-anomalies.json` records excluded rows and reasons. `leaderboard.json` is the validated, contiguous rank mapping used by the manifest and filenames.
 
 ## Git policy
 

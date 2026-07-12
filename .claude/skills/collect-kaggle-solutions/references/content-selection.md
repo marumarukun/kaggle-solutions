@@ -3,6 +3,8 @@
 ## Rank scope
 
 - Use the official final leaderboard.
+- Before assigning ranks, reject CLI rows whose `teamName` is empty or looks like a submission artifact filename (for example `perfect_submission.parquet`). Preserve rejected rows and their reasons in `.work/leaderboard-anomalies.json`, fetch enough additional rows to fill the requested scope, then assign contiguous ranks.
+- Review `.work/leaderboard-raw.json`, `.work/leaderboard-anomalies.json`, and the sanitized `.work/leaderboard.json` whenever an anomaly is detected. Do not silently trust the CLI row order after contamination is observed.
 - Treat every final rank from 1 through `max_rank` as an acquisition candidate.
 - Do not infer the Competition Gold cutoff. The user-supplied `max_rank` is the scope boundary.
 - Keep all ranks in the acquisition report even when no solution post is found.
@@ -72,6 +74,7 @@ Stop and request user input when:
 - The competition cannot be identified from the slug or URL.
 - Kaggle authentication is unavailable.
 - The official final leaderboard cannot be obtained, so ranks cannot be established.
+- A suspicious leaderboard row cannot be confidently classified as either a ranked team or a submission artifact.
 - Multiple plausible competitions remain after normalization.
 
 Continue and report the limitation when:
