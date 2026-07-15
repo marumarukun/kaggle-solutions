@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commit Assist"
+  short_description: "差分を分析してConventional Commitを作成"
+  default_prompt: "Use $commit-assist to analyze my changes, propose concise and detailed Conventional Commit messages, and commit my selection."
