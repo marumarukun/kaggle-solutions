@@ -1,0 +1,19 @@
+{
+    "recommendations": [
+        "ms-ceintl.vscode-language-pack-ja",
+        "usernamehw.errorlens",
+        "oderwat.indent-rainbow",
+        "ms-toolsai.jupyter",
+        "ms-toolsai.vscode-jupyter-cell-tags",
+        "ms-toolsai.jupyter-renderers",
+        "ms-toolsai.vscode-jupyter-slideshow",
+        "ms-python.vscode-pylance",
+        "ms-python.python",
+        "shardulm94.trailing-spaces",
+        "hoovercj.vscode-power-mode",
+        "charliermarsh.ruff",
+        "mhutchie.git-graph",
+        "mutantdino.resourcemonitor",
+        "tamasfe.even-better-toml",
+    ]
+}
