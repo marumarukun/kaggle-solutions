@@ -173,8 +173,49 @@ def next_page_token(stderr: str) -> str | None:
     return match.group(1) if match else None
 
 
-def paths(project_root: Path, slug: str) -> dict[str, Path]:
-    base = project_root / "outputs" / slug
+def competition_end_month(metadata: dict) -> str:
+    deadline = str(metadata.get("deadline", "")).strip()
+    match = re.match(r"^(\d{4})-(\d{2})-(\d{2})(?:T|$)", deadline)
+    if not match:
+        raise RuntimeError(
+            "Competition metadata has no valid deadline; cannot determine the "
+            "YYYYMM solution directory prefix"
+        )
+    try:
+        end_date = datetime.strptime("-".join(match.groups()), "%Y-%m-%d")
+    except ValueError as error:
+        raise RuntimeError(
+            f"Competition metadata has an invalid deadline {deadline!r}"
+        ) from error
+    return end_date.strftime("%Y%m")
+
+
+def competition_directory_name(slug: str, metadata: dict) -> str:
+    return f"{competition_end_month(metadata)}-{slug}"
+
+
+def find_existing_base(project_root: Path, slug: str) -> Path | None:
+    solutions_root = project_root / "solutions"
+    if not solutions_root.is_dir():
+        return None
+    pattern = re.compile(rf"\d{{4}}(?:0[1-9]|1[0-2])-{re.escape(slug)}")
+    candidates = sorted(
+        path
+        for path in solutions_root.iterdir()
+        if path.is_dir() and pattern.fullmatch(path.name)
+    )
+    if len(candidates) > 1:
+        relative_candidates = ", ".join(
+            str(path.relative_to(project_root)) for path in candidates
+        )
+        raise RuntimeError(
+            f"Multiple solution directories match competition {slug!r}: "
+            f"{relative_candidates}"
+        )
+    return candidates[0] if candidates else None
+
+
+def paths_from_base(base: Path) -> dict[str, Path]:
     work = base / ".work"
     return {
         "base": base,
@@ -193,6 +234,28 @@ def paths(project_root: Path, slug: str) -> dict[str, Path]:
         "summary": base / "summary.md",
         "pdf": base / "pdf",
     }
+
+
+def paths(project_root: Path, slug: str) -> dict[str, Path]:
+    base = find_existing_base(project_root, slug)
+    if base is None:
+        raise FileNotFoundError(
+            f"No collected state found for {slug!r} under "
+            f"{project_root / 'solutions'}. Run collect first."
+        )
+    return paths_from_base(base)
+
+
+def paths_for_metadata(project_root: Path, slug: str, metadata: dict) -> dict[str, Path]:
+    base = project_root / "solutions" / competition_directory_name(slug, metadata)
+    existing_base = find_existing_base(project_root, slug)
+    if existing_base is not None and existing_base != base:
+        raise RuntimeError(
+            f"Existing directory {existing_base.relative_to(project_root)} conflicts "
+            f"with competition deadline {metadata.get('deadline')!r}, which resolves "
+            f"to {base.relative_to(project_root)}"
+        )
+    return paths_from_base(base)
 
 
 SUBMISSION_FILE_EXTENSIONS = (
@@ -372,8 +435,6 @@ def collect(args: argparse.Namespace) -> None:
     if args.max_rank < 1:
         raise ValueError("max-rank must be a positive integer")
     project_root = Path(args.project_root).resolve()
-    target = paths(project_root, slug)
-    target["work"].mkdir(parents=True, exist_ok=True)
 
     matches, _ = run_kaggle_json(
         "competitions", "list", "--search", slug, "--page-size", "200"
@@ -387,6 +448,9 @@ def collect(args: argparse.Namespace) -> None:
         raise RuntimeError(
             f"Could not uniquely identify competition {slug!r} through Kaggle CLI"
         )
+    metadata = exact[0]
+    target = paths_for_metadata(project_root, slug, metadata)
+    target["work"].mkdir(parents=True, exist_ok=True)
     pages_data, _ = run_kaggle_json(
         "competitions", "pages", slug, "--content"
     )
@@ -410,7 +474,7 @@ def collect(args: argparse.Namespace) -> None:
             "max_rank": args.max_rank,
             "retrieved_at": now_iso(),
             "leaderboard_anomaly_count": len(leaderboard_anomalies),
-            "metadata": exact[0],
+            "metadata": metadata,
             "pages": pages_data,
         },
     )
@@ -955,9 +1019,30 @@ def verify(args: argparse.Namespace) -> None:
 def status(args: argparse.Namespace) -> None:
     slug = normalize_competition(args.competition)
     project_root = Path(args.project_root).resolve()
-    target = paths(project_root, slug)
+    base = find_existing_base(project_root, slug)
+    if base is None:
+        print(
+            json.dumps(
+                {
+                    "competition": slug,
+                    "output_directory": None,
+                    "competition_collected": False,
+                    "leaderboard_collected": False,
+                    "topics_collected": False,
+                    "manifest_exists": False,
+                    "summary_exists": False,
+                    "english_pdfs": 0,
+                    "japanese_pdfs": 0,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return
+    target = paths_from_base(base)
     result = {
         "competition": slug,
+        "output_directory": str(base.relative_to(project_root)),
         "competition_collected": target["competition"].exists(),
         "leaderboard_collected": target["leaderboard"].exists(),
         "topics_collected": target["topics"].exists(),

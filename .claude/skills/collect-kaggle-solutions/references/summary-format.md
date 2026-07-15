@@ -1,6 +1,6 @@
 # Summary format
 
-Create `outputs/<competition-slug>/summary.md` in Japanese. Use the following order.
+Create `solutions/<YYYYMM>-<competition-slug>/summary.md` in Japanese. Derive `YYYYMM` from the competition end date in the Kaggle CLI `deadline`. Use the following order.
 
 ## 1. Title and metadata
 

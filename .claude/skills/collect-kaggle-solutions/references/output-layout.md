@@ -1,9 +1,9 @@
 # Output layout
 
-Write each run under `outputs/<competition-slug>/`.
+Write each run under `solutions/<YYYYMM>-<competition-slug>/`. Derive `YYYYMM` from the competition end date in the `deadline` returned by Kaggle CLI; for example, `2025-10-14T23:59:00` maps to `202510`.
 
 ```text
-outputs/<competition-slug>/
+solutions/<YYYYMM>-<competition-slug>/
 ├── summary.md
 ├── pdf/
 │   ├── en/
@@ -38,7 +38,7 @@ Treat these as final, trackable artifacts:
 Treat `.work/` as reproducible local state and exclude it from Git. The project root `.gitignore` must contain:
 
 ```gitignore
-outputs/*/.work/
+solutions/*/.work/
 ```
 
 Do not place the only copy of a final Markdown or PDF inside `.work/`.

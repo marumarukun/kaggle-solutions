@@ -13,4 +13,4 @@ wheels/
 .env
 
 # Reproducible local work products from collect-kaggle-solutions
-outputs/*/.work/
+solutions/*/.work/

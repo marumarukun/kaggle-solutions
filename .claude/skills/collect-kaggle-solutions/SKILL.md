@@ -5,7 +5,7 @@ description: Collect ranked Kaggle competition solution write-ups through a user
 
 # Collect Kaggle Solutions
 
-Run the complete workflow from a Kaggle competition slug or URL and a positive `max_rank`. Work from the project root and store outputs under `outputs/<competition-slug>/`.
+Run the complete workflow from a Kaggle competition slug or URL and a positive `max_rank`. Work from the project root and store outputs under `solutions/<YYYYMM>-<competition-slug>/`, using the competition end month returned in the Kaggle CLI `deadline` for `YYYYMM`.
 
 ## Requirements
 
@@ -14,6 +14,7 @@ Run the complete workflow from a Kaggle competition slug or URL and a positive `
 - Do not use web search to fill missing solution posts.
 - Translate directly as the running agent. Do not call an external translation API.
 - Preserve existing artifacts unless the user explicitly requests refresh or overwrite.
+- Require a valid competition `deadline` from Kaggle CLI. Stop for user input rather than guessing the directory prefix when it is absent or invalid.
 
 ## Read the policies
 
@@ -46,7 +47,7 @@ Continue from valid existing files. Do not restart completed work without a reas
 uv run python "$PIPELINE" collect <competition> --max-rank <max_rank>
 ```
 
-This collects competition metadata, pages, the official final leaderboard, and every Discussion-list page exposed by Kaggle CLI. Stop for user input if the competition, authentication, or leaderboard cannot be established.
+This collects competition metadata, pages, the official final leaderboard, and every Discussion-list page exposed by Kaggle CLI. It creates the solution directory only after deriving `YYYYMM` from the competition deadline. Stop for user input if the competition, deadline, authentication, or leaderboard cannot be established.
 
 The collector validates leaderboard rows before assigning ranks. It quarantines rows whose team name looks like a submission filename, saves every retrieved CLI row to `.work/leaderboard-raw.json`, records exclusions in `.work/leaderboard-anomalies.json`, fetches replacement rows, and only then assigns ranks `1..max_rank`. If any anomaly is reported, review both files and confirm that `.work/leaderboard.json` starts with the actual winning team before continuing.
 
@@ -80,7 +81,7 @@ Review each `.work/raw/<topic-id>.json`. Select only substantive question-and-au
 
 ### 5. Write the Japanese pre-reading summary
 
-Create `outputs/<competition-slug>/summary.md` according to `summary-format.md`. Use only collected competition pages, leaderboard data, selected main posts, and retained author Q&A as evidence.
+Create `solutions/<YYYYMM>-<competition-slug>/summary.md` according to `summary-format.md`. Use only collected competition pages, leaderboard data, selected main posts, and retained author Q&A as evidence.
 
 Write for understanding before close reading. Explain competition-specific vocabulary early and describe frequently used technology both generally and in terms of the value it created in this competition.
 
@@ -130,6 +131,10 @@ Treat it as contaminated leaderboard data, not as a real final rank. Review `.wo
 ### Existing PDF filenames disagree with the validated leaderboard
 
 Do not only rename the PDFs. Correct the manifest, translations, summary, and all rank-bearing PDF contents, regenerate the PDFs with `--overwrite`, and run `verify`.
+
+### The deadline is missing or conflicts with an existing directory
+
+Do not guess the end month or create a second directory for the same competition. Confirm the Kaggle CLI metadata and stop for user input before renaming or overwriting existing artifacts.
 
 ## Examples
 
