@@ -1,4 +1,4 @@
 interface:
   display_name: "Kaggle Solution Collector"
-  short_description: "Collect and archive ranked Kaggle solutions"
-  default_prompt: "Use $collect-kaggle-solutions to collect solutions through a specified rank and create a Japanese summary plus English and Japanese PDFs."
+  short_description: "Turn ranked Kaggle solutions into a Gold tutorial"
+  default_prompt: "Use $collect-kaggle-solutions to collect solutions through a specified rank and create a Japanese pipeline tutorial plus English and Japanese PDFs."

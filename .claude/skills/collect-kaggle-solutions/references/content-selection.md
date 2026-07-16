@@ -63,9 +63,9 @@ Append retained exchanges under `Supplemental Q&A` in each PDF. Preserve the ori
 - Preserve code, URLs, model names, identifiers, formulas, tables, and numerical values.
 - Perform translation directly as the running agent. Do not call an external translation API.
 
-## Summary use of Q&A
+## Article use of Q&A
 
-Integrate a clarification into `summary.md` only when it materially changes or improves understanding of the method. Do not reproduce every selected Q&A exchange in the summary.
+Integrate a clarification into `article.md` only when it materially changes or improves understanding of the method. Do not reproduce every selected Q&A exchange in the article.
 
 ## Stop conditions
 

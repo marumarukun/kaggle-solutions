@@ -4,7 +4,7 @@ Write each run under `solutions/<YYYYMM>-<competition-slug>/`. Derive `YYYYMM` f
 
 ```text
 solutions/<YYYYMM>-<competition-slug>/
-├── summary.md
+├── article.md
 ├── pdf/
 │   ├── en/
 │   │   └── rank-<rank>-<slug>-<topic-id>-en.pdf
@@ -17,6 +17,7 @@ solutions/<YYYYMM>-<competition-slug>/
     ├── leaderboard.json
     ├── topics.json
     ├── manifest.json
+    ├── article-evidence.md
     ├── raw/
     ├── selected/
     ├── translations/
@@ -31,7 +32,7 @@ solutions/<YYYYMM>-<competition-slug>/
 
 Treat these as final, trackable artifacts:
 
-- `summary.md`
+- `article.md`
 - English PDFs under `pdf/en/`
 - Japanese PDFs under `pdf/ja/`
 
@@ -46,7 +47,7 @@ Do not place the only copy of a final Markdown or PDF inside `.work/`.
 ## Resume and overwrite policy
 
 - Reuse valid files in `.work/` when resuming an interrupted run.
-- Do not overwrite an existing `summary.md`, translation Markdown, or final PDF merely because the command was invoked again.
+- Do not overwrite an existing `article.md`, translation Markdown, or final PDF merely because the command was invoked again.
 - Regenerate an artifact when it is absent, fails validation, or the user explicitly requests refresh or overwrite.
 - Record source topic IDs, retrieval timestamps, selected comment IDs, and file checksums in `.work/manifest.json`.
 - Keep downloaded source images in `.work/assets/`; embed or reference them when rendering the final PDFs.

@@ -231,7 +231,8 @@ def paths_from_base(base: Path) -> dict[str, Path]:
         "assets": work / "assets",
         "html": work / "html",
         "verification": work / "verification",
-        "summary": base / "summary.md",
+        "article_evidence": work / "article-evidence.md",
+        "article": base / "article.md",
         "pdf": base / "pdf",
     }
 
@@ -922,6 +923,83 @@ def render(args: argparse.Namespace) -> None:
             )
 
 
+ARTICLE_REQUIRED_HEADINGS = (
+    "## はじめに",
+    "## コンペ概要",
+    "## 上位解法の全体像",
+    "## 上位解法から見えた、特に重要な発見",
+    "## うまくいかなかったアプローチ",
+    "## まとめ",
+    "## 参照した上位Solution",
+)
+
+
+def article_evidence_failures(evidence_path: Path, manifest: dict) -> list[str]:
+    if not evidence_path.exists():
+        return [f"missing article evidence worksheet: {evidence_path}"]
+
+    evidence = evidence_path.read_text(encoding="utf-8")
+    failures: list[str] = []
+    if "## Cross-team matrix" not in evidence:
+        failures.append("article evidence worksheet has no cross-team matrix")
+    for rank_entry in manifest.get("ranks", []):
+        if rank_entry.get("status") != "found":
+            continue
+        rank = int(rank_entry["rank"])
+        team = str(rank_entry["team"])
+        if f"## Rank {rank} — {team}" not in evidence:
+            failures.append(
+                f"article evidence worksheet has no block for rank {rank} team {team!r}"
+            )
+    return failures
+
+
+def article_failures(article_path: Path, manifest: dict) -> list[str]:
+    if not article_path.exists():
+        return [f"missing article: {article_path}"]
+
+    article = article_path.read_text(encoding="utf-8")
+    failures: list[str] = []
+    if not re.search(r"(?m)^# .+上位解法まとめ\s+—\s+.+$", article):
+        failures.append("article title must state the competition and a central thesis")
+    for heading in ARTICLE_REQUIRED_HEADINGS:
+        if heading not in article:
+            failures.append(f"article missing required heading: {heading}")
+    if article.count("```mermaid") < 2:
+        failures.append("article must contain at least two Mermaid diagrams")
+    if article.count("```") % 2:
+        failures.append("article has an unbalanced fenced code block")
+    if article.count("> **") < 2:
+        failures.append(
+            "article must emphasize the central thesis in the introduction and conclusion"
+        )
+
+    discussions_by_rank: dict[int, list[int]] = {}
+    for discussion in manifest.get("discussions", []):
+        rank = int(discussion["rank"])
+        topic_id = int(discussion["topic_id"])
+        discussions_by_rank.setdefault(rank, []).append(topic_id)
+        if f"/discussion/{topic_id}" not in article:
+            failures.append(f"article does not link discovered topic {topic_id}")
+
+    for rank, topic_ids in discussions_by_rank.items():
+        citation_count = sum(
+            article.count(f"/discussion/{topic_id}") for topic_id in topic_ids
+        )
+        if citation_count <= len(topic_ids):
+            failures.append(
+                f"rank {rank} has no inline body citation in addition to its reference link"
+            )
+
+    for rank_entry in manifest.get("ranks", []):
+        if rank_entry.get("status") != "not_found":
+            continue
+        rank = int(rank_entry["rank"])
+        if not re.search(rf"(?<!\d){rank}\s*位", article):
+            failures.append(f"article does not disclose unresolved rank {rank}")
+    return failures
+
+
 def verify(args: argparse.Namespace) -> None:
     slug = normalize_competition(args.competition)
     project_root = Path(args.project_root).resolve()
@@ -931,9 +1009,10 @@ def verify(args: argparse.Namespace) -> None:
     leaderboard = read_json(target["leaderboard"])
     failures.extend(leaderboard_failures(leaderboard, manifest.get("max_rank", 0)))
     failures.extend(manifest_leaderboard_failures(manifest, leaderboard))
+    failures.extend(article_evidence_failures(target["article_evidence"], manifest))
     rows: list[dict] = []
-    if not target["summary"].exists():
-        failures.append(f"missing summary: {target['summary'].relative_to(project_root)}")
+    article_path = target["article"]
+    failures.extend(article_failures(article_path, manifest))
     for discussion in manifest.get("discussions", []):
         topic_id = int(discussion["topic_id"])
         raw_path = target["raw"] / f"{topic_id}.json"
@@ -1012,7 +1091,7 @@ def verify(args: argparse.Namespace) -> None:
     write_json(report_path, report)
     if failures:
         raise RuntimeError("Verification failed:\n" + "\n".join(failures))
-    print(f"Verified summary and {len(rows)} PDFs")
+    print(f"Verified article and {len(rows)} PDFs")
     print(f"Report: {report_path.relative_to(project_root)}")
 
 
@@ -1030,7 +1109,8 @@ def status(args: argparse.Namespace) -> None:
                     "leaderboard_collected": False,
                     "topics_collected": False,
                     "manifest_exists": False,
-                    "summary_exists": False,
+                    "article_evidence_exists": False,
+                    "article_exists": False,
                     "english_pdfs": 0,
                     "japanese_pdfs": 0,
                 },
@@ -1047,7 +1127,8 @@ def status(args: argparse.Namespace) -> None:
         "leaderboard_collected": target["leaderboard"].exists(),
         "topics_collected": target["topics"].exists(),
         "manifest_exists": target["manifest"].exists(),
-        "summary_exists": target["summary"].exists(),
+        "article_evidence_exists": target["article_evidence"].exists(),
+        "article_exists": target["article"].exists(),
         "english_pdfs": len(list((target["pdf"] / "en").glob("*.pdf"))),
         "japanese_pdfs": len(list((target["pdf"] / "ja").glob("*.pdf"))),
     }

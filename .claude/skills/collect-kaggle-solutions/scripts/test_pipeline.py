@@ -100,8 +100,8 @@ class SolutionDirectoryTest(unittest.TestCase):
                 expected,
             )
             self.assertEqual(
-                pipeline.paths(project_root, "example-competition")["summary"],
-                expected / "summary.md",
+                pipeline.paths(project_root, "example-competition")["article"],
+                expected / "article.md",
             )
 
     def test_multiple_matching_directories_are_rejected(self) -> None:
@@ -124,6 +124,96 @@ class SolutionDirectoryTest(unittest.TestCase):
             result = json.loads(output.getvalue())
             self.assertIsNone(result["output_directory"])
             self.assertFalse(result["competition_collected"])
+            self.assertFalse(result["article_evidence_exists"])
+            self.assertFalse(result["article_exists"])
+
+
+class ArticleEvidenceValidationTest(unittest.TestCase):
+    def test_complete_evidence_worksheet_passes(self) -> None:
+        manifest = {
+            "ranks": [
+                {"rank": 1, "team": "winner", "status": "found"},
+                {"rank": 2, "team": "runner-up", "status": "not_found"},
+            ]
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory) / "article-evidence.md"
+            evidence.write_text(
+                "## Rank 1 — winner\n\n## Cross-team matrix\n", encoding="utf-8"
+            )
+            self.assertEqual(
+                pipeline.article_evidence_failures(evidence, manifest), []
+            )
+
+    def test_missing_found_team_block_is_rejected(self) -> None:
+        manifest = {
+            "ranks": [{"rank": 1, "team": "winner", "status": "found"}]
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory) / "article-evidence.md"
+            evidence.write_text("## Cross-team matrix\n", encoding="utf-8")
+            failures = pipeline.article_evidence_failures(evidence, manifest)
+            self.assertTrue(any("no block for rank 1" in item for item in failures))
+
+
+class ArticleValidationTest(unittest.TestCase):
+    def valid_article(self) -> str:
+        headings = "\n\n".join(pipeline.ARTICLE_REQUIRED_HEADINGS)
+        return f"""# Example 上位解法まとめ — central thesis
+
+{headings}
+
+> **opening thesis**
+
+```mermaid
+flowchart LR
+    A --> B
+```
+
+```mermaid
+flowchart LR
+    B --> C
+```
+
+[body source](https://www.kaggle.com/competitions/example/discussion/100)
+[reference](https://www.kaggle.com/competitions/example/discussion/100)
+
+2位は未取得です。
+
+> **transferable thesis**
+"""
+
+    def test_complete_article_passes(self) -> None:
+        manifest = {
+            "ranks": [
+                {"rank": 1, "status": "found"},
+                {"rank": 2, "status": "not_found"},
+            ],
+            "discussions": [{"rank": 1, "topic_id": 100}],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            article = Path(directory) / "article.md"
+            article.write_text(self.valid_article(), encoding="utf-8")
+            self.assertEqual(pipeline.article_failures(article, manifest), [])
+
+    def test_missing_inline_citation_and_rank_disclosure_are_rejected(self) -> None:
+        manifest = {
+            "ranks": [
+                {"rank": 1, "status": "found"},
+                {"rank": 2, "status": "not_found"},
+            ],
+            "discussions": [{"rank": 1, "topic_id": 100}],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            article = Path(directory) / "article.md"
+            value = self.valid_article().replace(
+                "[body source](https://www.kaggle.com/competitions/example/discussion/100)\n",
+                "",
+            ).replace("2位は未取得です。", "未取得の順位があります。")
+            article.write_text(value, encoding="utf-8")
+            failures = pipeline.article_failures(article, manifest)
+            self.assertTrue(any("no inline body citation" in item for item in failures))
+            self.assertTrue(any("unresolved rank 2" in item for item in failures))
 
 
 if __name__ == "__main__":

@@ -1,11 +1,13 @@
 ---
 name: collect-kaggle-solutions
-description: Collect ranked Kaggle competition solution write-ups through a user-specified final rank using Kaggle CLI, create a Japanese pre-reading summary, and render one original-language and one Japanese PDF per solution post. Use when the user supplies a Kaggle competition slug or URL and asks to acquire, summarize, translate, archive, or PDF the top-ranked or Competition Gold solutions, including substantive author Q&A while excluding congratulatory comments.
+description: Collect ranked Kaggle competition solution write-ups through a user-specified final rank using Kaggle CLI, synthesize them into a Japanese pipeline-oriented tutorial article for an Expert pursuing Competition Gold, and render one original-language and one Japanese PDF per solution post. Use when the user supplies a Kaggle competition slug or URL and asks to collect, study, summarize, translate, archive, or PDF top-ranked or Competition Gold solutions, including substantive author Q&A while excluding congratulatory comments.
 ---
 
 # Collect Kaggle Solutions
 
 Run the complete workflow from a Kaggle competition slug or URL and a positive `max_rank`. Work from the project root and store outputs under `solutions/<YYYYMM>-<competition-slug>/`, using the competition end month returned in the Kaggle CLI `deadline` for `YYYYMM`.
+
+The standard Markdown deliverable is `article.md`: an original, cross-solution tutorial organized by the competition's actual problem-solving pipeline. Do not create `summary.md`, rank-by-rank solution cards, or a generic audit report.
 
 ## Requirements
 
@@ -21,7 +23,7 @@ Run the complete workflow from a Kaggle competition slug or URL and a positive `
 Read these files before selecting or writing content:
 
 - [content-selection.md](references/content-selection.md): rank, post, and comment selection.
-- [summary-format.md](references/summary-format.md): required `summary.md` structure.
+- [article-format.md](references/article-format.md): evidence worksheet, article structure, writing rules, and quality gate.
 - [manifest-schema.md](references/manifest-schema.md): rank-to-topic mapping contract.
 - [output-layout.md](references/output-layout.md): final and ignored intermediate files.
 
@@ -79,11 +81,17 @@ uv run python "$PIPELINE" fetch <competition>
 
 Review each `.work/raw/<topic-id>.json`. Select only substantive question-and-author-answer chains according to `content-selection.md`. Add all retained message IDs to the discussion's `selected_comment_ids` in chronological conversational order. Include both question and response IDs.
 
-### 5. Write the Japanese pre-reading summary
+### 5. Build the evidence worksheet and write the Japanese article
 
-Create `solutions/<YYYYMM>-<competition-slug>/summary.md` according to `summary-format.md`. Use only collected competition pages, leaderboard data, selected main posts, and retained author Q&A as evidence.
+Follow `article-format.md` in order.
 
-Write for understanding before close reading. Explain competition-specific vocabulary early and describe frequently used technology both generally and in terms of the value it created in this competition.
+1. Review every selected main post and retained author Q&A.
+2. Create or update `.work/article-evidence.md` using the evidence worksheet in `article-format.md`. Record each team's thesis, pipeline, strongest reported effect, failures, validation, and constraints before drafting prose.
+3. Derive a competition-native pipeline and one central thesis from the completed worksheet. Organize findings by problem and causal stage, not by final rank.
+4. Create `solutions/<YYYYMM>-<competition-slug>/article.md` using only collected competition pages, validated leaderboard data, selected main posts, and retained author Q&A as evidence.
+5. Run both the manual quality gate in `article-format.md` and the automated `verify` command before reporting completion.
+
+Write for a Competition Expert pursuing Gold, Master, or Grandmaster, but assume the reader did not participate. Explain the task first, compare teams at the point where their approaches diverge, preserve reported numbers and conditions, and make failures and transferable decision rules easy to find. Link source-backed claims inline to their Kaggle Discussions. Never invent a missing team's method or an ablation that the authors did not report.
 
 ### 6. Translate each selected discussion
 
@@ -112,7 +120,8 @@ uv run python "$PIPELINE" verify <competition>
 Do not report completion until verification passes. Confirm:
 
 - The manifest passes all consistency checks.
-- `summary.md` exists.
+- `.work/article-evidence.md` covers every found team and contains a cross-team matrix.
+- `article.md` passes the structural and source-coverage checks.
 - Each selected Discussion has one original and one Japanese PDF.
 - PDFs have pages and extractable text.
 - Japanese PDFs contain Japanese text.
@@ -120,7 +129,7 @@ Do not report completion until verification passes. Confirm:
 
 ## Completion report
 
-Report the number of targeted ranks, found teams, solution posts, original PDFs, Japanese PDFs, and qualifying Q&A chains. List unresolved ranks without implying that no solution exists. Link the final summary and both PDF directories.
+Report the number of targeted ranks, found teams, solution posts, original PDFs, Japanese PDFs, and qualifying Q&A chains. List unresolved ranks without implying that no solution exists. Link the final article and both PDF directories.
 
 ## Troubleshooting
 
@@ -130,7 +139,7 @@ Treat it as contaminated leaderboard data, not as a real final rank. Review `.wo
 
 ### Existing PDF filenames disagree with the validated leaderboard
 
-Do not only rename the PDFs. Correct the manifest, translations, summary, and all rank-bearing PDF contents, regenerate the PDFs with `--overwrite`, and run `verify`.
+Do not only rename the PDFs. Correct the manifest, translations, article, and all rank-bearing PDF contents, regenerate the PDFs with `--overwrite`, and run `verify`.
 
 ### The deadline is missing or conflicts with an existing directory
 
@@ -140,3 +149,4 @@ Do not guess the end month or create a second directory for the same competition
 
 - `uv run python "$PIPELINE" collect rsna-intracranial-aneurysm-detection --max-rank 11` quarantines a row such as `perfect_submission.parquet`, obtains the next valid team, and writes validated ranks 1 through 11.
 - `uv run python "$PIPELINE" check-manifest <competition>` fails when a manifest team or score is shifted relative to `leaderboard.json`.
+- A medical-imaging article may use `DICOM normalization → candidate localization → local classification → series aggregation → runtime` as its body, while an audio article may use `domain adaptation → representation → event modeling → long context → blending → CPU inference`. Derive sections from the evidence; do not reuse either sequence mechanically.
