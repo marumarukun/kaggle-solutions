@@ -116,6 +116,12 @@ def compact_text(value: str) -> str:
     return re.sub(r"\s+", "", value)
 
 
+def compact_identity(value: str) -> str:
+    """Normalize decorative symbols that PDF fonts may omit during extraction."""
+    normalized = re.sub(r"[^\w]+", "", compact_text(value), flags=re.UNICODE)
+    return normalized or compact_text(value)
+
+
 def normalize_competition(value: str) -> str:
     value = value.strip()
     match = re.fullmatch(
@@ -1061,7 +1067,7 @@ def verify(args: argparse.Namespace) -> None:
             compact_pdf = compact_text(text)
             if not text.strip():
                 failures.append(f"no extractable text: {pdf_path.relative_to(project_root)}")
-            if compact_text(str(discussion["team"])) not in compact_pdf:
+            if compact_identity(str(discussion["team"])) not in compact_identity(text):
                 failures.append(f"team missing from PDF: {pdf_path.relative_to(project_root)}")
             if language == "ja" and not re.search(r"[ぁ-んァ-ヶ一-龯]", text):
                 failures.append(f"Japanese text missing: {pdf_path.relative_to(project_root)}")

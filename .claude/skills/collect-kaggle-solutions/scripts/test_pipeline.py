@@ -76,6 +76,14 @@ class LeaderboardValidationTest(unittest.TestCase):
         ]
         self.assertEqual(pipeline.leaderboard_failures(rows, 2), [])
 
+    def test_pdf_identity_comparison_ignores_unrendered_emoji(self) -> None:
+        expected = "BirdCLEF+ 2026 Team🤗🤗🤗"
+        extracted = "Team BirdCLEF+ 2026 Team"
+        self.assertIn(
+            pipeline.compact_identity(expected),
+            pipeline.compact_identity(extracted),
+        )
+
 
 class SolutionDirectoryTest(unittest.TestCase):
     def test_directory_name_uses_deadline_month(self) -> None:
