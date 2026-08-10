@@ -2,15 +2,15 @@
 
 ## はじめに
 
-これは、[ROGII - Wellbore Geology Prediction](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction) の公開Solutionを、地質対比の因果パイプラインとして読み直した記事である。コンペは2026年8月5日23:59 UTC（日本時間8月6日8:59）に終了し、本稿の収集スナップショットは2026年8月7日17:54 JSTである。
+これは、[ROGII - Wellbore Geology Prediction](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction) の公開Solutionを、地質対比の因果パイプラインとして読み直した記事である。コンペは2026年8月5日23:59 UTC（日本時間8月6日8:59）に終了し、本稿の収集スナップショットは2026年8月10日13:44 JSTである。
 
 課題は、水平井に沿って観測されたガンマ線ログ（GR）と近傍の垂直参照井（typewell）を手掛かりに、未知区間のTrue Vertical Thickness（TVT）を1行ごとに推定することだった。CNN、U-Net、HMM、particle filter（PF）、勾配ブースティングとモデル名は多彩だが、上位解法が解こうとした失敗は驚くほど共通している。
 
 > **中心課題は局所的な回帰精度ではない。似たGR模様が複数の深度に現れるため、井戸全体が「どの地層の枝に乗るか」を外すと、長区間がまとめて約15 ftずれる。強い解法は、物理的な座標系で探索範囲を絞り、複数の軌跡仮説を保持し、系列全体と不確実性で選択または平均した。**
 
-公式最終順位1〜22位を対象にし、公開済みの一次Solutionは15チーム・15投稿見つかった。対象は1、2、3、4、5、6、7、8、9、10、11、13、14、18、21位である。前回スナップショット後に2、3、4、5、8、10、11位の7投稿が加わり、単一の「正しい経路」を当てるより、参照系と候補の誤り方を設計することの重要性がさらに明確になった。
+公式最終順位1〜22位を対象にし、公開済みの一次Solutionは18チーム・18投稿見つかった。対象は1、2、3、4、5、6、7、8、9、10、11、13、14、17、18、20、21、22位である。前回スナップショット後に17、20、22位の3投稿が加わった。新しい報告も、単一の「正しい経路」を当てるより、参照系、残差の時間尺度、候補の誤り方を分けて設計する重要性を補強している。
 
-12位、15位、16位、17位、19位、20位、22位については、検索時点でKaggle CLIが公開していた全212件のDiscussionsから、順位・チーム・著者を結び付けられる一次Solutionを発見できなかった。これは「Solutionが存在しない」という意味ではなく、Kaggle CLIで取得できたDiscussion内では未発見という意味に限る。リーダーボードの異常行は0件だった。
+12位、15位、16位、19位については、検索時点でKaggle CLIが公開していた全230件のDiscussionsから、順位・チーム・著者を結び付けられる一次Solutionを発見できなかった。これは「Solutionが存在しない」という意味ではなく、Kaggle CLIで取得できたDiscussion内では未発見という意味に限る。リーダーボードの異常行は0件だった。
 
 ## コンペ概要
 
@@ -79,11 +79,15 @@ flowchart LR
 
 21位は、生のTVT約11,000 ftではなく、既知区間末尾からおよそ±16 ftのdriftを予測した。[2位](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction/discussion/733432)はtypewell側を0.5 ft/binの±128 ft、MD側を32 ft/columnへ落とし、[5位](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction/discussion/733522)は通常anchor±64 ft、端へ寄ったwellだけ±96 ftで再推論した。目的は同じで、モデル容量を絶対深度の記憶ではなく、anchor周辺の曖昧性へ使うことだ。
 
+[20位](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction/discussion/733845)はこの考えを非一様gridへ進めた。driftの大半がanchor近傍に集まりながらtailは±100 ftを超えるため、`g=A·sinh(b·t)`で中央を約0.26 ft/cell、端を±115 ftまで伸ばした。均一±60 ft gridの「中央では粗いのにtailは切れる」という二重の浪費を避けた設計である。
+
 最も明快な再座標化は[18位のchord](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction/discussion/733250)だった。既知坑井軌跡の始点と終点を直線で結び、その線からの残差を縦軸にする。単純な機械的chordが、first-stage予測から引く二段方式より強く、同チームは単体CVが6.4から5.2へ改善した主因を座標系、解像度、合成データと報告している。
 
 ### 座標系はfeatureではなく仮説空間である
 
 chordやanchorは「入力列を1本増やす」話ではない。縦windowが狭くなるため0.5〜1 ft/binを確保でき、wrong-modeの複数ridgeを同じ画像内で比較できる。1位は最終既知TVT相対でtypewell側±100 ftを0.5 ft刻みにし、[10位](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction/discussion/733315)は`A=TVT+Z`の変動約160 ftを直接stateにすると、既知の幾何へ解像度を浪費すると指摘した。smoothness priorは`dA/dMD`へ置きつつ、予測stateは変動中央値26.4 ftのTVTへ置く、という役割分担である。
+
+[17位](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction/discussion/733860)は、`TVT-last_known_tvt`を直接当てるlegに加え、局所傾きを予測してanchorから積分するlegを持った。[22位](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction/discussion/733739)も`dTVT→cumsum→TVT_anchor`を採用し、単体では10.30と平凡なTCNが既存poolとの残差相関0.60によりblend CVを約1.0改善した。座標変換は単体精度だけでなく、既存modelと異なる誤差を作る手段でもある。
 
 判断則は、まずtruthを使ったper-well定数・直線・低次曲線oracleを測ることだ。もし定数を除くだけで誤差が大きく消えるなら、複雑なrow featureより前に、levelを表す座標と候補を設計すべきである。
 
@@ -94,6 +98,8 @@ chordやanchorは「入力列を1本増やす」話ではない。縦windowが�
 複数チームは、水平井位置×候補TVTの各点にGR一致度を描いたcost volumeを使った。[9位](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction/discussion/733150)はwhole-well U-Netで384 depth bins×640 MD columnsを分類し、18位はchord-relative画像の複数ridgeをheatmap/detection headで追跡した。5位はtypewell/horizontal GR、coverage、known path、relative row、`-ΔZ`、dip、azimuth、複数のmisfitを14 channelへ分け、同じTVT×MD canvasに「一致」と「物理的な動き」を共存させた。
 
 [11位](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction/discussion/733305)は、そもそも照合先を変えた。別井戸・別装置のtypewellではなく、正解TVTが見える自well prefixから`GR-vs-TVT`表を作ると、評価可能な548 wellの64%で自己参照の方が近かった。例示wellではmisfitがtypewell 14.4に対しself 6.6であり、この自己照合画像が終盤最大のU-Net改善だった。ただし既知prefixが覆わないTVTではtypewellへ戻す。
+
+20位の`grtx`は、horizontal GRとtypewell GRを別々のstemへ分けず、同じ重みのencoderへ通した。別stemはCVを悪化させたため、同じfeature spaceで対応付けること自体が重要だった。5〜6層Transformerで反復模様へglobal contextを与え、cross-attentionのcost mapをRAFTで反復修正する。readoutからRAFTへ進むと773 well中524を改善し、249を悪化させながらpooled RMSEは7.55→5.94となった。
 
 ### classificationで曖昧性を残し、期待値で連続値へ戻す
 
@@ -125,6 +131,8 @@ flowchart TD
 
 7位はHMM 5.676からlearned emissionsで5.301、さらにsecond-pass refinerで5.209へ進めた。refiner同士の不一致をgateにし、平均では弱い近傍signalを不確かな場所だけで使った結果、最終5.2025 pooled / 5.2128 near-endとなった。[7位の報告](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction/discussion/733154)が示すのは、強い系列priorの後でも「どこを直すか」の学習が残ることだ。
 
+17位はこの残差を時間尺度で分けた。264特徴のGBDT ensembleでanchor相対levelを予測し、CNNで局所傾きを積分し、それでも残る600 ft単位の上下shiftをLightGBMで引いた。PFのみ11.08→直接level 7.09→傾き併用6.66→segment補正6.32と改善し、最終Private 6.376となった。whole-path modelを1個作る代わりに、level・slope・segment biasを別々に解く構成である。
+
 ### 候補を増やすなら、間違い方を増やす
 
 [6位](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction/discussion/733226)は、typewell、自分のprefix、XY近傍、GR類似近傍、self-graftという5参照と16 PF設定から91曲線を作った。top-kで1本を選ぶより、全候補をsoft averageするcurve ensemblerが強かった。15候補のCV 6.50から、30候補で5.94、最終91候補で5.4577、Private 5.984へ到達した。
@@ -132,6 +140,8 @@ flowchart TD
 3位は候補をHMM/PF内だけで増やさず、Last-PS offset NN、Delta NN、直接相関SDFまで混ぜた。5候補を行ごとに非負・和1へ制約するBiLSTM SoftMax Gateは5.2797で、候補範囲外へ自由補正するdirect BiLSTMの5.4023に全5 foldで勝った。弱い単体候補でも誤り方が違えば局所的に選べる一方、全候補共通のdriftは凸包の外へ直せない、という限界も明示している。
 
 [8位](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction/discussion/733281)は20 PFの256 MD window oracleが1.2766まで下がることを確認し、1本選択ではなくLGBM/TCN rankerのweightをsegment間で補間した。さらに平均CVが0.41悪いspatial-group U-Netを30%混ぜると、stratified単独6.437から6.309へ改善した。多様性は単体順位ではなく、同じwellで違う失敗をするかで測るべきである。
+
+20位はこの原則を数値で示した。単体8.44のPF residual treeは既存PFと残差相関0.96でblend gainが0だった一方、単体11〜14のGR-free geometry legは約-0.4をもたらした。22位も40〜50 memberをfamily名ではなくresidual-space correlationで評価し、OOF生成とtest decodeがbit-exactに一致すること、単体LB transferが確認できることをmembership条件にした。
 
 重要なのは本数ではない。相関0.99の候補を追加しても効かず、弱くても異なる方向へ外すPFが効いた。14位でもXGBoostとU-Netという名称上異なるfamilyの予測相関は0.982で、family名は多様性の証拠にならなかった。
 
@@ -153,6 +163,8 @@ flowchart TD
 
 7位はさらに別の使い方をした。in-foldのfirst-pass予測はRMSE 3.20なのにheld-outは9.34で、refinerがconditioning channelをコピーしてしまう。そこでtruthへlow-pass random walk誤差を足した約6,000 synthetic wellを作り、「自信ありげに間違う親をいつ疑うか」を60 epoch学習し、realは8 epochだけfine-tuneした。
 
+20位はanchor位置を毎epochずらし、rareなkinkを注入し、tailを厚くした`whip`とformation levelを変える`layer`を別loaderで生成した。22位のfake-anchor augmentationも、全SSEの約75%がfar-anchor toeに集まる診断から既知prefixを人工的に手前へ戻し、Public 6.367へ改善した。両者に共通するのは、合成量を増やす前に「現実で不足している距離・曲率・tail」を特定したことだ。
+
 合成データの判断則は、見た目のrealismではない。学習させたい技能、誤り分布、mode数、既存priorのwin shareを定義し、それがrealの診断統計と対応しているかで採否を決める。
 
 ## 5. 物理・近傍signalは、OOFで作り、不確実な場所だけに使う
@@ -164,6 +176,8 @@ flowchart TD
 [1位](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction/discussion/733220)は、局所surfaceを`S=TVT+Z+C`と置き、近傍から`ΔTVT=aΔX+bΔY-ΔZ`を推定した。XY channelはlocal CVを約0.3改善したがPublicを悪化させた。それでもCVを信じ、近傍品質が低い約10%のwellにはXYなしmodelを使う条件付きensembleにした。
 
 [10位](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction/discussion/733315)は、近傍surface stageでCV 5.7544→5.5762という全期間最大の改善を得た一方、Publicは5.648→5.977へ悪化した。同じ52 Public well上のpaired差は2.95 sigmaで、hidden queryの最近傍train well距離中央値はtrain内470 ftに対し683 ftだった。CVは壊れていたのではなく、donorが密なtraining geometryへ正しく答えていたのである。
+
+20位はGR-freeな`ancc`/`geotx`の重みを、最寄りcontrol point距離`nd`に対し`W/(1+(nd/D)^2)`で減衰させた。近傍がないwellではほぼ0へ落とす一方、PF residual legのlearned per-well/per-point gateはCVで良くLBで崩れたためfixed weightに戻した。22位ではQとHMM decodeが11.5 ft以上食い違うwellだけoverrideするgateがCV -0.052に対しPublic -0.167を得た。強いrouterではなく、意味のある不一致へ限定した小さな介入が残った。
 
 3位のgateは、候補値だけでなくcandidate spread、GR missing、PSからの距離、Last-PS NNの予測標準偏差を使った。1位の約10% fallback、7位のrefiner disagreementと同じく、priorを作ることと使う場所を決めることを分離している。
 
@@ -181,11 +195,15 @@ flowchart TD
 
 21位はpooledのほか、近傍が少ない155 well、per-well median、worst 5 wellを追った。pooledを4.80まで下げた後期modelがPrivate 6.57にとどまり、medianを悪化させる案を捨てた最終版はPrivate 6.504だった。9位はcombiner自身も4/5 foldで再fitするheldfoldと、fold-seedを隔離するstrict scoreを用い、banded ensembleのchain 5.06に対しheldfold 5.27、strict 5.28と見積もった。
 
+17位はnaive PFのper-well RMSEでnormal/mid/high/catastrophicの4層に分けた。catastrophicは50/773 well、約6%しかないのにpooled RMSEを大きく動かすため、全体改善だけでなく全層、特にnormal層が改善することを採用条件にした。hard wellだけ直してnormalを傷つける変更はPublicでも悪化しやすかった。
+
 2位はbase/treatのper-well SSE差が大きいwellを順に除き、何well外すと改善が消えるかを見た。見かけ上−0.28でも8/773 wellを除くとほぼ消える案を棄却し、Public規模の52 wellを除いても残る案を採用した。3位は5-foldを5種類作り、同一Gaussian-NLL系を3 splitから5 splitへ増やしてCV 5.3069→5.2884、Private 5.903→5.836とした。1つのsplitでcandidateとgateを二重にOOF化するだけでなく、well割当そのものへの依存も平均している。
 
 ### Public LBは絶対差と順位を分ける
 
-7位ではlocal CVがv18をbest、v9をworstとしたのに、Publicは完全に逆順だった。Privateはlocalの順序をほぼ支持した。6位でもSubmission BはCVが良くPublicが悪かったが、Private 5.984でSubmission Aの5.997を上回った。5位の直近6提出もPublicとPrivateがほぼ逆相関で、CVとPrivate順位はよく対応した。一方10位は3 sigmaで棄却した近傍版が結果としてPrivate 6.179、最終版6.269だった。良い意思決定過程と、1回のhidden sampleで良い結果を引くことは同じではない。
+7位ではlocal CVがv18をbest、v9をworstとしたのに、Publicは完全に逆順だった。Privateはlocalの順序をほぼ支持した。6位でもSubmission BはCVが良くPublicが悪かったが、Private 5.984でSubmission Aの5.997を上回った。5位の直近6提出もPublicとPrivateがほぼ逆相関で、CVとPrivate順位はよく対応した。
+
+新規公開分はこの結論をさらに強くした。20位の単体`grtx`群ではCVとPrivateの相関が+0.44、PublicとPrivateは-0.16だった。22位の全50提出はPrivateがPublicより平均`+1.47±0.95 ft`悪く、endgame 36提出ではPublicとPrivateのSpearman相関が-0.48、773-well CVとPrivateは+0.84だった。一方10位は3 sigmaで棄却した近傍版が結果としてPrivate 6.179、最終版6.269だった。良い意思決定過程と、1回のhidden sampleで良い結果を引くことは同じではない。
 
 結論は「Publicを無視」ではなく、Publicが示せるものを限定することだ。一定のoffsetや大きなregime差は監視できるが、150 well前後の小splitにおける0.1未満の順序はmodel selectionの根拠にしない。well単位のfold分散とtailを併記し、2提出はスコア順位だけでなく実測error diversityでhedgeする。
 
@@ -199,15 +217,17 @@ flowchart TD
 
 再現性もruntimeの一部である。PF seed、fold artifact、feature順、学習済みtransformを固定し、「research CVを出した経路」ではなく「hidden rerunで実際に走る経路」をOOF評価する。高速化は最後の最適化ではなく、試行回数、smoother、seed ensemble、最終提出の生存確率を決めるモデリング判断だった。
 
+22位はこの要件を`decode-parity`と呼び、OOFを作ったdecodeとtest-time decodeがbit-exactでないmemberをpoolへ入れなかった。40〜50 memberの予測をcacheして約2 CPU分でrecipeを再評価できるようにしたことも、diversity検証と提出再現性を同じ仕組みに乗せた例である。
+
 ## 上位解法から見えた、特に重要な発見
 
 ### 1. 誤差の本体はshapeよりlevelである
 
-14位のoracle分解と、6・18・21位のwrong-ridge分析は一致する。局所曲線が滑らかでも、datum branchを1つ外すだけで長区間の二乗誤差が支配される。まずper-well定数・直線oracleでlevel/shape比を測るべきだ。
+14位のoracle分解、17位の600 ft残差補正、6・18・21位のwrong-ridge分析は一致する。局所曲線が滑らかでも、datum branchを1つ外すだけで長区間の二乗誤差が支配される。まずper-well定数・直線oracleでlevel/shape比を測るべきだ。
 
 ### 2. 最良の表現は「候補を消さずに並べる」
 
-PF曲線、alignment volume、cost volume、spline bankは外見が違うが、いずれも複数仮説を系列文脈へ渡す。早いargmaxやrow regressionでmodeを潰すより、posterior mean、forward-backward、soft curve averageで不確実性を保つ方が強かった。
+PF曲線、alignment volume、cost volume、spline bank、RAFT correlation pyramidは外見が違うが、いずれも複数仮説を系列文脈へ渡す。早いargmaxやrow regressionでmodeを潰すより、posterior mean、forward-backward、soft curve average、反復registrationで不確実性を保つ方が強かった。
 
 ### 3. 物理priorは答えではなく、GRの別解を絞る補助証拠である
 
@@ -215,26 +235,26 @@ PF曲線、alignment volume、cost volume、spline bankは外見が違うが、�
 
 ### 4. 合成データの品質は、realismではなく目的関数で決まる
 
-21位はrealのaliasing統計を再現し、5位はlatent geologyから2種類の観測を作り、8位は±15 ft decoyを注入し、7位は親modelの失敗をfabricateした。成功条件は「何を学ばせる合成か」が明確で、その診断量がreal taskと結び付くことだった。
+21位はrealのaliasing統計を再現し、5位はlatent geologyから2種類の観測を作り、8位は±15 ft decoyを注入し、7位は親modelの失敗をfabricateした。20位はrare kinkとtail、22位はfar-anchor不足を狙った。成功条件は「何を学ばせる合成か」が明確で、その診断量がreal taskと結び付くことだった。
 
 ### 5. uncertaintyは予測区間よりroutingに効いた
 
-entropy、refiner disagreement、candidate spreadは、不確実性を表示するだけでなく、弱い近傍signalをどこで使うか、どのstage incrementを足すか、いつabstainするかを決めた。平均的に無価値なsignalも条件付きでは価値を持つ。
+entropy、refiner disagreement、candidate spread、Q-HMM disagreementは、不確実性を表示するだけでなく、弱い近傍signalをどこで使うか、どのstage incrementを足すか、いつabstainするかを決めた。平均的に無価値なsignalも条件付きでは価値を持つ。
 
 ### 6. selection errorもモデル誤差と同じく設計対象である
 
-fold seed、hard-well偏り、Publicの小標本、seed luck、runtime failureにより、良いmodelを作っても選べない。well bootstrap、strict heldfold、median/tail、実測error correlation、shippable runtimeをmodel selectionへ含める必要がある。
+fold seed、hard-well偏り、Publicの小標本、seed luck、runtime failureにより、良いmodelを作っても選べない。17位の難易度層、20位の残差相関、22位のdecode-parityが加えたのは、平均CVの前後に「誰を直したか」「違う誤りか」「同じ経路で出せるか」を置く視点である。
 
 ## うまくいかなかったアプローチ
 
-- **row-wise tabular regressionを主役にする**: 残差がsegment単位の二峰性になるとfeatureを増やしても頭打ちになった。error decompositionでlevel支配ならwhole-path表現へ移る。
+- **row-wise tabular regressionだけを主役にする**: 残差がsegment単位の二峰性になるとfeatureを増やしても頭打ちになった。17位のGBDTが残ったのは、傾き積分と600-ft shift補正を別legで足したからである。error decompositionでlevel支配ならwhole-path表現または時間尺度別の補正へ移る。
 - **候補をhard top-k/MAPで選ぶ**: GRだけで枝を識別できないwellでは、鋭い選択がwrong-modeを固定する。2位では1,024 rollout内のoracleは強くてもrerankerとGRPOがoverfitした。情報が足りない領域ではsoft averageやposterior meanが合理的である。
 - **PF出力を無条件に単純平均する**: 異なる枝へcommitした曲線の中間は物理的に不正確になった。曲線全体のquality/diversityを学習し、候補がtruthをbracketする条件を確認する。
-- **空間priorを全wellへ強く入れる**: 近傍密度を上げたstandalone priorやwell-level constant shiftはCVだけ改善してLBで逆転した。OOFでpurgeし、信頼度gateとabstentionを持たせる。
-- **合成データを見た目だけrealにする**: too-easy synthetic、poor generator、real統計への過度な接近はいずれも失敗した。mode数、prior性能、誤差spectrumなどtask固有の診断量で校正する。
+- **空間priorを全wellへ強く入れる**: 近傍密度を上げたstandalone priorやwell-level constant shiftはCVだけ改善してLBで逆転し、20位のlearned per-well/per-point gateもLBで崩れた。OOFでpurgeし、transferを確認できないrouterより距離減衰や限定的abstentionを使う。
+- **合成データを見た目だけrealにする**: too-easy synthetic、poor generator、real統計への過度な接近に加え、20位の視覚的に自然なsteep-heel variantもCVを悪化させた。mode数、prior性能、誤差spectrumなどtask固有の診断量で校正する。
 - **相関したemissionをそのままforward-backwardへ積む**: 数百行の軽い過信が指数的に増幅した。decimation、entropy gate、real fine-tuneでcalibrationを戻す。
 - **posteriorをlossだけで多峰化する**: CE-onlyやmixupではwrong-modeは救えなかった。観測にない識別情報はlossから生まれないので、座標、物理、参照、系列contextを改善する。
-- **model family名をdiversityとみなす**: XGBとU-Netでも予測相関0.982だった。OOF error correlationとpairでのtail改善を測る。
+- **model family名をdiversityとみなす**: XGBとU-Netでも予測相関0.982だった。20位では単体8.44の相関0.96 modelがblend gain 0、単体11〜14のgeometryが約-0.4だった。OOF error correlationとpairでのtail改善を測る。
 - **seedやcandidateを無制限に増やす**: 相関0.99の候補は増やしても効かず、8位では同じrecipeのseed平均が良いseed単体より悪化した。一方pretrain seed再抽選だけでfoldが9.081→6.496となり、前段scoreから良いseedを識別できなかった。seed数ではなく後段OOFの独立誤差で判断する。
 - **最後にruntimeを考える**: 高精度variantが9時間を超え、採点されない例が出た。hidden wellあたり時間を早期に測り、精度と生存marginを同じpromotion gateへ入れる。
 
@@ -242,7 +262,7 @@ fold seed、hard-well偏り、Publicの小標本、seed luck、runtime failure�
 
 ## まとめ
 
-公開済み15解法から再構成できる勝ち筋は次の通りである。
+公開済み18解法から再構成できる勝ち筋は次の通りである。
 
 1. per-well定数・直線oracleで、誤差がrow noiseかlevel/branchかを診断する。
 2. 最終既知TVT、`S=TVT+Z`、chordなどで状態空間を狭い相対座標へ変える。
@@ -272,5 +292,8 @@ fold seed、hard-well偏り、Publicの小標本、seed luck、runtime failure�
 - 11位 IIDA — [Using the Well's Own Known Section as the Reference](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction/discussion/733305)
 - 13位 monnu — [13th Place Solution](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction/discussion/733174)
 - 14位 keithtyser — [A Hierarchical U-Net Stack with Seed Averaging](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction/discussion/733201)
+- 17位 Falcon — [Direct level + Integrated slope + Segment correction](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction/discussion/733860)
 - 18位 yu4u — [18th Place Solution](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction/discussion/733250)
+- 20位 Yannan Chen — [RAFT-refined GR↔typewell matcher](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction/discussion/733845)
 - 21位 goonew — [21st Place Solution](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction/discussion/733190)
+- 22位 N & A & O & A & A — [Five Engines and a Hard Lesson About Leaderboards](https://www.kaggle.com/competitions/rogii-wellbore-geology-prediction/discussion/733739)
