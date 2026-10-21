@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
@@ -146,12 +147,17 @@ def find_kaggle() -> str:
 
 
 def run_kaggle_json(*args: str) -> tuple[object, str]:
-    result = subprocess.run(
-        [find_kaggle(), *args, "--format", "json"],
-        check=False,
-        text=True,
-        capture_output=True,
-    )
+    for attempt in range(6):
+        result = subprocess.run(
+            [find_kaggle(), *args, "--format", "json"],
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+        rate_limited = "429" in (result.stderr or result.stdout)
+        if not (result.returncode and rate_limited) or attempt == 5:
+            break
+        time.sleep(15 * 2**attempt)
     if result.returncode:
         detail = (result.stderr or result.stdout).strip()
         raise RuntimeError(f"Kaggle CLI failed: {detail}")
