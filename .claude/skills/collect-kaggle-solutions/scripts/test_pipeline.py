@@ -166,10 +166,20 @@ class ArticleEvidenceValidationTest(unittest.TestCase):
 
 class ArticleValidationTest(unittest.TestCase):
     def valid_article(self) -> str:
-        headings = "\n\n".join(pipeline.ARTICLE_REQUIRED_HEADINGS)
+        headings = "\n\n".join(
+            heading
+            for heading in pipeline.ARTICLE_REQUIRED_HEADINGS
+            if heading != pipeline.ARTICLE_REFERENCE_HEADING
+        )
         return f"""# Example 上位解法まとめ — central thesis
 
 {headings}
+
+## 1. first lever
+
+## 2. second lever
+
+## 3. third lever
 
 > **opening thesis**
 
@@ -184,12 +194,48 @@ flowchart LR
 ```
 
 [body source](https://www.kaggle.com/competitions/example/discussion/100)
-[reference](https://www.kaggle.com/competitions/example/discussion/100)
-
-2位は未取得です。
 
 > **transferable thesis**
+
+{pipeline.ARTICLE_REFERENCE_HEADING}
+
+| 順位 | チーム | 一言で言うと | 投稿 |
+| --- | --- | --- | --- |
+| 1位 | winner | summary | [reference](https://www.kaggle.com/competitions/example/discussion/100) |
+
+2位は未取得です。
 """
+
+    def write_and_check(self, value: str) -> list[str]:
+        manifest = {
+            "ranks": [
+                {"rank": 1, "status": "found"},
+                {"rank": 2, "status": "not_found"},
+            ],
+            "discussions": [{"rank": 1, "topic_id": 100}],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            article = Path(directory) / "article.md"
+            article.write_text(value, encoding="utf-8")
+            return pipeline.article_failures(article, manifest)
+
+    def test_overlong_body_is_rejected(self) -> None:
+        padding = "あ" * (pipeline.ARTICLE_MAX_BODY_CHARS + 1)
+        value = self.valid_article().replace(
+            "> **opening thesis**", f"> **opening thesis**\n\n{padding}"
+        )
+        failures = self.write_and_check(value)
+        self.assertTrue(any("article body is" in item for item in failures))
+
+    def test_lever_section_count_is_enforced(self) -> None:
+        value = self.valid_article().replace("## 3. third lever\n", "")
+        failures = self.write_and_check(value)
+        self.assertTrue(any("numbered lever sections" in item for item in failures))
+
+    def test_reference_section_requires_summary_table(self) -> None:
+        value = self.valid_article().replace("| 一言で言うと |", "| 概要 |")
+        failures = self.write_and_check(value)
+        self.assertTrue(any("one-line summary column" in item for item in failures))
 
     def test_complete_article_passes(self) -> None:
         manifest = {

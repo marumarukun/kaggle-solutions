@@ -1,13 +1,13 @@
 ---
 name: collect-kaggle-solutions
-description: Collect ranked Kaggle competition solution write-ups through a user-specified final rank using Kaggle CLI, synthesize them into a Japanese pipeline-oriented tutorial article for an Expert pursuing Competition Gold, and render one original-language and one Japanese PDF per solution post. Use when the user supplies a Kaggle competition slug or URL and asks to collect, study, summarize, translate, archive, or PDF top-ranked or Competition Gold solutions, including substantive author Q&A while excluding congratulatory comments.
+description: Collect ranked Kaggle competition solution write-ups through a user-specified final rank using Kaggle CLI, synthesize them into a concise, intuition-first Japanese article that explains the three to five decisive levers with representative examples for an Expert pursuing Competition Gold, and render one original-language and one Japanese PDF per solution post. Use when the user supplies a Kaggle competition slug or URL and asks to collect, study, summarize, translate, archive, or PDF top-ranked or Competition Gold solutions, including substantive author Q&A while excluding congratulatory comments.
 ---
 
 # Collect Kaggle Solutions
 
 Run the complete workflow from a Kaggle competition slug or URL and a positive `max_rank`. Work from the project root and store outputs under `solutions/<YYYYMM>-<competition-slug>/`, using the competition end month returned in the Kaggle CLI `deadline` for `YYYYMM`.
 
-The standard Markdown deliverable is `article.md`: an original, cross-solution tutorial organized by the competition's actual problem-solving pipeline. Do not create `summary.md`, rank-by-rank solution cards, or a generic audit report.
+The standard Markdown deliverable is `article.md`: a concise, original article that explains the big picture of what decided the competition. It covers three to five decisive levers, each with one or two representative teams, and leaves exhaustive per-team detail in the evidence worksheet. Do not create `summary.md`, rank-by-rank solution cards, or a generic audit report.
 
 ## Requirements
 
@@ -23,7 +23,7 @@ The standard Markdown deliverable is `article.md`: an original, cross-solution t
 Read these files before selecting or writing content:
 
 - [content-selection.md](references/content-selection.md): rank, post, and comment selection.
-- [article-format.md](references/article-format.md): evidence worksheet, article structure, writing rules, and quality gate.
+- [article-format.md](references/article-format.md): evidence worksheet, lever selection, article structure, writing rules, readability review, and quality gate.
 - [manifest-schema.md](references/manifest-schema.md): rank-to-topic mapping contract.
 - [output-layout.md](references/output-layout.md): final and ignored intermediate files.
 
@@ -87,11 +87,12 @@ Follow `article-format.md` in order.
 
 1. Review every selected main post and retained author Q&A.
 2. Create or update `.work/article-evidence.md` using the evidence worksheet in `article-format.md`. Record each team's thesis, pipeline, strongest reported effect, failures, validation, and constraints before drafting prose.
-3. Derive a competition-native pipeline and one central thesis from the completed worksheet. Organize findings by problem and causal stage, not by final rank.
-4. Create `solutions/<YYYYMM>-<competition-slug>/article.md` using only collected competition pages, validated leaderboard data, selected main posts, and retained author Q&A as evidence.
-5. Run both the manual quality gate in `article-format.md` and the automated `verify` command before reporting completion.
+3. Derive one central thesis and three to five decisive levers from the completed worksheet. Choose them by impact and breadth. A lever used by more than half of the found teams, or that was any team's largest single gain, must be a main lever.
+4. Create `solutions/<YYYYMM>-<competition-slug>/article.md` in the structure of `article-format.md`, using only collected competition pages, validated leaderboard data, selected main posts, and retained author Q&A as evidence. Read one of the reference example articles named there first.
+5. Run `verify`, then the independent readability review in `article-format.md`. Fact-check each accepted suggestion against the sources, apply it, and re-run `verify`.
+6. Run the manual quality gate in `article-format.md` before reporting completion.
 
-Write for a Competition Expert pursuing Gold, Master, or Grandmaster, but assume the reader did not participate. Explain the task first, compare teams at the point where their approaches diverge, preserve reported numbers and conditions, and make failures and transferable decision rules easy to find. Link source-backed claims inline to their Kaggle Discussions. Never invent a missing team's method or an ablation that the authors did not report.
+Write for a Competition Expert pursuing Gold, Master, or Grandmaster who did not participate and wants the big picture, not full coverage. Lead with the conclusion, explain the task and the metric's counterintuitive properties, then teach each lever as problem → response → representative example → why it works. Keep sentences light on numbers, define every term at first use, and put secondary techniques in one supplementary table. Link source-backed claims inline to their Kaggle Discussions. Never invent a missing team's method or an ablation that the authors did not report, and do not strengthen a claim while shortening it.
 
 ### 6. Translate each selected discussion
 
@@ -121,7 +122,7 @@ Do not report completion until verification passes. Confirm:
 
 - The manifest passes all consistency checks.
 - `.work/article-evidence.md` covers every found team and contains a cross-team matrix.
-- `article.md` passes the structural and source-coverage checks.
+- `article.md` passes the structural, length (body ≤ 13,000 characters), lever-count (3–5), reference-table, and source-coverage checks.
 - Each selected Discussion has one original and one Japanese PDF.
 - PDFs have pages and extractable text.
 - Japanese PDFs contain Japanese text.
@@ -141,6 +142,10 @@ Treat it as contaminated leaderboard data, not as a real final rank. Review `.wo
 
 Do not only rename the PDFs. Correct the manifest, translations, article, and all rank-bearing PDF contents, regenerate the PDFs with `--overwrite`, and run `verify`.
 
+### WeasyPrint cannot load `libgobject-2.0-0` on macOS
+
+Homebrew libraries are not on the default dynamic-library path. Prefix pipeline commands with `DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib`.
+
 ### The deadline is missing or conflicts with an existing directory
 
 Do not guess the end month or create a second directory for the same competition. Confirm the Kaggle CLI metadata and stop for user input before renaming or overwriting existing artifacts.
@@ -149,4 +154,4 @@ Do not guess the end month or create a second directory for the same competition
 
 - `uv run python "$PIPELINE" collect rsna-intracranial-aneurysm-detection --max-rank 11` quarantines a row such as `perfect_submission.parquet`, obtains the next valid team, and writes validated ranks 1 through 11.
 - `uv run python "$PIPELINE" check-manifest <competition>` fails when a manifest team or score is shifted relative to `leaderboard.json`.
-- A medical-imaging article may use `DICOM normalization → candidate localization → local classification → series aggregation → runtime` as its body, while an audio article may use `domain adaptation → representation → event modeling → long context → blending → CPU inference`. Derive sections from the evidence; do not reuse either sequence mechanically.
+- A cell-tracking article used three levers: "注釈のない細胞を負例にしない", "分裂をnodeごとに値付けし、グラフ全体で決める", and "未知の胚で判断する". A wellbore article used four: "最後に分かっている位置からのずれを当てる", "候補を消さずに残し、井戸全体で決める", "Publicを信じすぎない", and "合成データで間違えやすい状況を練習させる". Derive levers from the evidence; do not reuse these mechanically.

@@ -1,24 +1,30 @@
-# Pipeline tutorial article format
+# Concise big-picture article format
 
 Create `solutions/<YYYYMM>-<competition-slug>/article.md` in Japanese. Derive `YYYYMM` from the Kaggle CLI competition `deadline`.
 
-The reader is a Kaggle Competition Expert pursuing Gold, Master, or Grandmaster, but may not have entered this competition. Teach how the task was decomposed, which interventions mattered, when they failed, and what decision process transfers elsewhere. Produce an original tutorial article; do not imitate a named writer's distinctive wording.
+The reader is a Kaggle Competition Expert pursuing Gold, Master, or Grandmaster who did not enter this competition. They want the **big picture**: what decided the competition, why, and a few representative examples. They do not want every team's method. Write so that a non-participant understands the main point in one pass, without opening any source.
+
+Two finished articles are the reference examples for tone, length, and structure:
+
+- `solutions/202609-biohub-cell-tracking-during-development/article.md`
+- `solutions/202608-rogii-wellbore-geology-prediction/article.md`
+
+Read one of them before drafting. Do not copy their wording or competition-specific content.
 
 ## Non-negotiable outcome
 
-The article must let the reader answer these questions without opening every source first:
+After one read, the reader can answer:
 
-1. What was predicted, from what input, under which metric and execution constraints?
-2. What was the central bottleneck shared by top teams?
-3. What causal pipeline did strong solutions build around that bottleneck?
-4. Where did teams make meaningfully different choices, and what evidence supports them?
-5. Which attractive ideas failed, under what conditions, and what rule should transfer?
+1. What was predicted, from what input, and how was it scored?
+2. Which properties of the metric or data were counterintuitive?
+3. What three to five decisions separated the top teams, and why did each work?
+4. What tempting ideas failed?
 
-Organize the main body by the competition's causal pipeline, not by rank. Mention ranks only as evidence for a technique or counterexample.
+Optimize for comprehension, not coverage. If a fact does not help answer one of these questions, leave it in the evidence worksheet.
 
 ## Step 1: Build the evidence worksheet
 
-Before drafting `article.md`, create `.work/article-evidence.md`. It is an intermediate reasoning artifact and must not be the final deliverable.
+Before drafting `article.md`, create `.work/article-evidence.md`. It is the place for exhaustive detail, so the article does not have to carry it.
 
 Add one block for every discovered team:
 
@@ -35,63 +41,57 @@ Add one block for every discovered team:
 - Runtime and implementation constraints: <only material choices>
 - Failures and caveats: <failed experiments, limits, conditions>
 - Useful author Q&A: <clarification that changes understanding; otherwise none>
-- Candidate article stages: <one or more causal stages>
+- Candidate article stages: <one or more decisive levers>
 ```
 
 Then add `## Cross-team matrix` and this table:
 
-| Candidate stage or bottleneck | Teams / ranks | Shared pattern | Important exception | Strongest evidence | Transferable rule |
+| Candidate lever or bottleneck | Teams / ranks | Shared pattern | Important exception | Strongest evidence | Transferable rule |
 |---|---|---|---|---|---|
 
-Evidence worksheet rules:
+Worksheet rules:
 
-- Review every selected post before choosing the article thesis. Do not let the first-place solution define the whole narrative by default.
+- Review every selected post before choosing the thesis. Do not let the first-place solution define the whole narrative by default.
 - Copy model names, identifiers, scores, metric axes, and before/after directions exactly.
-- Record “not reported” instead of manufacturing an ablation.
+- Record "not reported" instead of manufacturing an ablation.
 - Treat a team's reported delta as evidence under that team's conditions, not as a controlled cross-team comparison.
-- Record negative results and runtime or selection failures with the same care as successful methods.
-- Use retained author Q&A only when it clarifies implementation, evidence, or transfer conditions.
-- Keep source URLs beside evidence while extracting it. This prevents unsupported prose during drafting.
+- Record negative results and runtime or selection failures with the same care as successes.
+- Keep source URLs beside evidence.
 
-Do not start the article until every found team has a block and the cross-team matrix is complete.
+Do not start the article until every found team has a block and the matrix is complete.
 
-## Step 2: Derive the story from the evidence
+## Step 2: Choose the thesis and the decisive levers
 
-### Select the central thesis
+### Central thesis
 
-Choose one sentence that explains the competition-specific bottleneck and connects several independently reported top solutions. A good thesis describes a problem and the strategic response, for example:
+Write one sentence that names the competition-specific bottleneck and the strategic response shared by several top teams. Reject generic theses such as "ensembling and good preprocessing mattered."
 
-> When the useful signal is tiny relative to the input, narrow the search space before classification and preserve local evidence until aggregation.
+### Select three to five levers ("勝負所")
 
-Reject theses that merely say ensembling, preprocessing, or strong models were important. The thesis should explain why the winning pipeline took its shape.
+From the cross-team matrix, pick the three to five levers that best explain the final ranking. Rank candidates by two criteria:
 
-### Build a causal pipeline
+- **Impact**: the largest reported single gain for any team, or a large Public/Private effect.
+- **Breadth**: how many found teams used it.
 
-Cluster the cross-team matrix into approximately five to eight stages. Order them by dependency:
+A lever that **more than half of the found teams used**, or that was **the largest single improvement for any team**, must become a main lever. Do not push it into the supplementary table, even if it seems less elegant than the others. Example: in ROGII, synthetic data was used by more than half of the teams and was the largest single gain for one team, so it needed its own section, not a table row.
 
-1. data generation or domain gap;
-2. preprocessing, localization, or representation;
-3. core prediction;
-4. context, aggregation, or specialization;
-5. validation and selection;
-6. ensemble, post-processing, or inference constraints.
+Everything else that mattered, but less, goes into one supplementary table. Facts that do not fit either stay in the worksheet.
 
-These are prompts, not mandatory headings. Use only stages that fit the competition. Merge adjacent stages when they solve the same problem, and split a stage when the top teams made an important, teachable choice there.
+### Representative examples
 
-### Select evidence for the article
+For each lever, choose **one or two representative teams**, and at most three. Prefer:
 
-For each stage, select:
+- the clearest quantitative before/after;
+- the most intuitive mechanism;
+- one counterexample or failure, when it sharpens the point.
 
-- at least two teams when a cross-team pattern exists;
-- the strongest quantitative result available;
-- an exception or failure that limits the claim;
-- the reason the technique matched the task, metric, data, or runtime.
-
-Every discovered team must appear in at least one substantive body claim unless its post contains no usable technical detail. Every discovered post must still appear in the reference list.
+Do not list every team that used the lever.
 
 ## Step 3: Write `article.md`
 
-Use the following fixed outer structure. Only the numbered pipeline sections are competition-adaptive.
+Target length: **body of about 9,000–12,000 Japanese characters**, measured from the title to just before `## 参照した上位Solution`. `verify` fails above 13,000 characters and checks for three to five numbered lever sections.
+
+Use this fixed outer structure.
 
 ### Title
 
@@ -99,125 +99,124 @@ Use the following fixed outer structure. Only the numbered pipeline sections are
 # <Competition title> 上位解法まとめ — <central thesis in plain Japanese>
 ```
 
-The subtitle must express the competition-specific lesson. Avoid generic subtitles such as “Gold solutions explained.”
-
 ### `## はじめに`
 
-In approximately four to seven short paragraphs:
+Short. In order:
 
-- introduce the real task and link the competition page;
-- state when the competition ended;
-- contrast the diversity of model families with the common strategic pattern;
-- place the central thesis in a short emphasized blockquote;
-- state the target rank range and number of found teams;
-- identify unresolved ranks and say only that no first-party Solution was found in the Kaggle CLI-exposed Discussions searched;
-- mention a validated leaderboard anomaly only when one occurred.
-
-Do not start with collection mechanics or a metadata table.
+1. One or two sentences: what the competition was, with a link, and when it ended.
+2. One sentence: model families varied, but the decisive points were shared. "結論を先に書きます。"
+3. The thesis as an emphasized blockquote (`> **...**`), two to three sentences.
+4. One sentence previewing the levers.
+5. Scope: target ranks, found teams and posts, and unresolved ranks, stating only that no first-party Solution was found in the Kaggle CLI-exposed Discussions searched.
 
 ### `## コンペ概要`
 
-Use these subsections:
+- `### タスク`: three bullets: **入力**, **出力**, **評価**. Then "この指標には、直感に反する性質が3つあります。" followed by a numbered list of three counterintuitive properties. Each item starts with a bold one-line claim, then one to three plain sentences, with one representative number if it helps.
+- `### 提供データ`: a two-column table (`データ`, `内容`) with four to six rows.
+- `### このコンペが難しい理由`: three to five one-line bullets.
 
-1. `### タスク`: explain input, output granularity, metric, and the metric's strategic consequence in plain language.
-2. `### 提供データ`: use one compact table with `データ`, `内容`, and `解法上の役割`.
-3. `### このコンペが難しい理由`: give approximately four to seven concrete bullets tied to the data, metric, validation, or execution environment.
-
-Assume the reader did not participate. Define competition-native abbreviations before relying on them.
+Define every abbreviation or domain term at first use. If more than about five need defining, add a short glossary table at the end of `コンペ概要`.
 
 ### `## 上位解法の全体像`
 
-Draw one original Mermaid flowchart that shows the full winning pipeline from input and supervision to prediction. Follow it with approximately three to six numbered axes explaining where teams differed.
+1. One sentence describing the shared skeleton, then "差がついたのは、下図で色をつけたN か所です。"
+2. A Mermaid flowchart of the shared skeleton, with each lever as a highlighted node (`classDef key fill:#fde68a,stroke:#b45309,color:#000`) linked by a dotted edge to the stage it affects.
+3. Optionally, one sentence defining the central optimization or model term.
 
-The diagram must synthesize the collected evidence. Do not copy a source diagram or decorate the article with an unrelated architecture chart.
+### Numbered lever sections
 
-### Adaptive numbered pipeline sections
+Write three to five `## <number>. <lever>` sections. Name each section after the decision, in plain Japanese ("注釈のない細胞を負例にしない", "Publicを信じすぎない"), not after a model family. Mark the most important one with "この節が本記事の中心です。"
 
-Create approximately five to eight `## <number>. <stage>` sections. Name each stage after the problem being solved, not a model family. Prefer “探索範囲を絞る” over “nnU-Net,” and “録音環境の差を埋める” over “EfficientNet.”
+Within a section, use these labeled building blocks when they fit:
 
-Within each stage, move through this teaching sequence when evidence permits:
+- `**問題**:` the failure mode in one to three sentences, ideally with a concrete picture.
+- `**上位の対処**:` the shared response in one sentence, then one to three bullets, each starting with a bold rank (`- **4位**は…`), each with one key number and an inline link.
+- `**逆をやるとどうなるか**:` or a counterexample paragraph.
+- `**なぜ効くか**:` the mechanism in plain words, when it is not obvious.
 
-1. explain the failure mode or task constraint;
-2. compare how multiple teams addressed it;
-3. show the strongest reported quantitative or precise qualitative evidence;
-4. explain the mechanism in task-specific terms;
-5. show an exception, failed variant, or transfer condition;
-6. state the decision rule the reader should retain.
+Use `###` subsections only when a lever has distinct steps. Put the second required Mermaid diagram in the central lever section. It should show the key mechanism, ideally as a before/after comparison (for example, uniform cost versus per-instance cost, or "decide immediately" versus "keep candidates and decide globally").
 
-Use short descriptive `###` subsections rather than repeating team cards. A paragraph may compare several teams; link each source-backed claim inline to the relevant Kaggle Discussion.
+### `### 補足：そのほかに効いた工夫`
 
-Add at least one more original Mermaid diagram beyond the overview diagram. Use it for the most important mechanism, branching choice, or trade-off. Additional visualizations may use the smallest useful form:
+Place this at the end of the last lever section. One table:
 
-- Mermaid flowchart for a mechanism or alternative pipeline;
-- table for repeated-field comparison or ablation;
-- compact text diagram for a simple transformation.
+| 工夫 | なぜ効くか | 代表例 |
+| --- | --- | --- |
 
-Aim for two to four diagrams total, with at least two in Mermaid. Each must explain a relationship that prose alone would make harder to grasp.
+Use four to seven rows. Each 代表例 cell holds one team, one number, and an inline link. This table is also where you cite teams that are not in the main sections.
 
 ### `## 上位解法から見えた、特に重要な発見`
 
-Write approximately four to six numbered `###` findings. Each finding must combine evidence from earlier sections into one memorable causal conclusion. Do not introduce unsupported new facts or merely repeat model names.
+Three or four `###` items, each two to three sentences. Explain **why** the levers worked under this competition's conditions. Do not repeat numbers from the body. Refer to section numbers instead.
 
 ### `## うまくいかなかったアプローチ`
 
-Select approximately six to ten high-signal failures. Format each bullet as:
+Five or six bullets:
 
 ```markdown
-- **<tempting approach>**: <what happened, under which condition, and what decision rule follows>
+- **<tempting approach>**: <what happened, one number> <one-line rule>（[N位](url)）。
 ```
 
-Prefer counterexamples involving domain shift, excessive pseudo-label rounds, harmful resampling, validation shake-up, ensemble correlation, hard filtering, or runtime failure when the sources support them. End with a short synthesis explaining why the failures occurred; do not imply that a method is universally bad.
+End with one sentence naming the shared cause.
 
 ### `## まとめ`
 
-First reconstruct the winning pipeline as approximately five to eight numbered steps. Then state the transferable principle in an emphasized blockquote. Finish with a short paragraph naming other task families where the reasoning may apply and the condition that makes the transfer valid.
-
-Do not write a “next time in this competition” experiment list. The same competition may not recur.
+1. "上位解法の流れをN行にまとめると、次のとおりです。" followed by a five to seven step numbered list. Each step is one line.
+2. The transferable principle as an emphasized blockquote (`> **...**`).
+3. One or two sentences on other task families where the reasoning applies, and the condition that makes the transfer valid.
 
 ### `## 参照した上位Solution`
 
-List every discovered first-party Solution in final-rank order. Preserve complementary posts as separate list items when needed. Include rank, recognizable title or team/author, and the direct Kaggle Discussion URL.
+One sentence, then a table in final-rank order:
+
+| 順位 | チーム | 一言で言うと | 投稿 |
+| --- | --- | --- | --- |
+
+`一言で言うと` is one plain-Japanese phrase, under about 40 characters. Put all of a team's posts in its row. After the table, list unresolved ranks with their team names.
+
+## Writing rules
+
+- Write in です/ます style, in natural Japanese. Avoid literal English sentence structure and unnecessary English fragments, such as "datum branch" or "coherent posterior", unless the term is defined.
+- Lead every paragraph with its conclusion. One paragraph makes one point.
+- At most one or two numbers per sentence. If a sentence would hold three teams or more than two numbers, split it into bullets or a table.
+- When a cause-and-effect step is not obvious, add one sentence that explains why. Arithmetic examples are good ("+1.0 − 1.2 = −0.2 なので常に損").
+- Prefer concrete pictures ("胚全体が1フレームで5 µm流れていれば…") over abstract statements.
+- Use one term per concept throughout. Define it once.
+- Mention ranks only as evidence for a lever, never as the organizing principle.
+- Do not repeat the same fact in the introduction, body, findings, and conclusion.
 
 ## Source and accuracy rules
 
 - Use only collected competition pages, validated leaderboard data, selected first-party posts, and retained author Q&A.
-- Link factual method claims and all reported results inline, near the relevant sentence. The final reference list alone is not sufficient attribution.
-- Preserve the metric axis. Distinguish CV, Public LB, Private LB, single-fold, single-model, and ensemble results.
-- Write “the team reported” or equivalent when causality rests on one team's experiment.
-- When synthesizing across teams, use language such as “the collected Solutions suggest” and make the inference traceable to preceding evidence.
-- Never infer a missing rank's method, team authorship, or unreported experiment.
-- Do not treat leaderboard differences between teams as ablations.
-- Preserve technical identifiers in their conventional form; otherwise prefer natural Japanese over unnecessary English fragments.
-- Explain an important term once, then use it consistently.
+- Link every factual method claim and reported result inline, near the sentence. The reference table alone is not sufficient attribution. `verify` requires every found rank to have at least one inline link besides its reference-table link. Satisfy this through the lever sections, the supplementary table, or the failure list; do not add paragraphs only for coverage.
+- Preserve the metric axis (CV, Public, Private, single model, ensemble) and the direction of change.
+- When simplifying, do not strengthen a claim. Keep qualifiers such as "学習データ上で", "ごく一部の例外を除き", and "複数要素の同時変更".
+- Label interpretations that are not stated in the post ("〜と考えられます", "〜と読み取れます").
+- Never infer a missing rank's method or an unreported ablation. Do not treat leaderboard differences between teams as ablations.
 
-## Human-readable writing rules
+## Step 4: Independent readability review
 
-- Teach the problem before the catalog of methods.
-- Keep paragraphs focused on one causal point and lead with the conclusion.
-- Use concrete numbers when they change prioritization; omit low-value implementation trivia.
-- Give each table and diagram one job and explain the takeaway immediately before or after it.
-- Compare teams inside the relevant pipeline stage so the reader sees alternatives at the moment of decision.
-- Avoid exhaustive team cards, acquisition-status tables, evidence labels on every sentence, audit ledgers, and generic caution sections.
-- Avoid repeating the same fact in the introduction, body, findings, failures, and conclusion unless the later occurrence adds a new decision rule.
-- Keep the article skimmable with descriptive headings, but make the prose coherent when read continuously.
+After the article passes `verify`, ask an independent reviewer to read it as a non-participant. Use a subagent on a different model when available; otherwise use a fresh subagent. Ask for:
+
+- passages that are hard to understand intuitively, with replacement text;
+- overloaded paragraphs;
+- undefined terms;
+- repetition;
+- whether a non-participant can follow the main argument in one read.
+
+The reviewer must not edit files. Check every suggestion against the sources before applying it. Reviewers tend to guess identifiers and add unsupported causal claims. Re-run `verify` after applying.
 
 ## Manual quality gate
 
-Before running automated verification, confirm all of the following:
-
 - [ ] `.work/article-evidence.md` contains every found team and a completed cross-team matrix.
-- [ ] A non-participant can explain the input, target, evaluation unit, metric, constraints, and central difficulty from the opening sections.
-- [ ] The title and opening blockquote express a competition-specific causal thesis.
-- [ ] Main sections follow the actual problem-solving pipeline rather than rank order or a reusable generic taxonomy.
-- [ ] Every found team contributes at least one substantive body claim when usable technical detail exists.
-- [ ] Every discovered post is linked in the final reference list and source-backed claims use inline links.
-- [ ] The article includes at least two original Mermaid diagrams, including the overall pipeline.
-- [ ] Reported numbers preserve their metric axis, conditions, direction, and source wording.
-- [ ] At least one exception or failure constrains each major conclusion where evidence permits.
-- [ ] The important findings are causal syntheses rather than architecture counts.
-- [ ] The failure section contains memorable decision rules without becoming an exhaustive experiment ledger.
-- [ ] The conclusion transfers a decision process, not a list of competition-specific model names.
-- [ ] Missing ranks are disclosed without inferred methods or claims that no Solution exists.
-- [ ] Repeated facts, generic ML explanations, and low-value implementation details have been removed.
-- [ ] Mermaid fences are balanced and diagrams use valid, readable syntax.
-- [ ] `article.md` is the only standard synthesized Markdown deliverable; no new `summary.md` or “refined” variant was created.
+- [ ] A non-participant can state the task, the metric, and its counterintuitive properties after reading `コンペ概要`.
+- [ ] The thesis is competition-specific and appears as a blockquote in `はじめに`.
+- [ ] There are three to five lever sections, chosen by impact and breadth. No lever used by more than half of the found teams, and no team's largest single gain, is relegated to the supplementary table.
+- [ ] Each lever has one to three representative teams, not a full list.
+- [ ] The overview Mermaid highlights the levers, and a second Mermaid explains the central mechanism.
+- [ ] Every sentence holds at most two numbers. No paragraph compares more than two teams in running prose.
+- [ ] Every abbreviation and domain term is defined at first use.
+- [ ] `発見` explains why, without repeating body numbers.
+- [ ] The reference section is the one-line summary table and lists unresolved ranks.
+- [ ] The body is within the length target, and `verify` passes.
+- [ ] The independent readability review was run, and its accepted suggestions were fact-checked.

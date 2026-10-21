@@ -929,6 +929,10 @@ def render(args: argparse.Namespace) -> None:
             )
 
 
+ARTICLE_REFERENCE_HEADING = "## 参照した上位Solution"
+ARTICLE_MAX_BODY_CHARS = 13_000
+ARTICLE_LEVER_SECTIONS = (3, 5)
+
 ARTICLE_REQUIRED_HEADINGS = (
     "## はじめに",
     "## コンペ概要",
@@ -978,6 +982,23 @@ def article_failures(article_path: Path, manifest: dict) -> list[str]:
     if article.count("> **") < 2:
         failures.append(
             "article must emphasize the central thesis in the introduction and conclusion"
+        )
+
+    body, _, references = article.partition(ARTICLE_REFERENCE_HEADING)
+    if len(body) > ARTICLE_MAX_BODY_CHARS:
+        failures.append(
+            f"article body is {len(body)} characters; keep it within "
+            f"{ARTICLE_MAX_BODY_CHARS} by moving detail to the evidence worksheet"
+        )
+    lever_count = len(re.findall(r"(?m)^## \d+\. ", body))
+    low, high = ARTICLE_LEVER_SECTIONS
+    if not low <= lever_count <= high:
+        failures.append(
+            f"article has {lever_count} numbered lever sections; use {low} to {high}"
+        )
+    if "| 一言で言うと |" not in references:
+        failures.append(
+            "reference section must be a table with a one-line summary column (一言で言うと)"
         )
 
     discussions_by_rank: dict[int, list[int]] = {}
