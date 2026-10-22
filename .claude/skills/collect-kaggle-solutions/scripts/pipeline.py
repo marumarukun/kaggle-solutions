@@ -1094,7 +1094,13 @@ def verify(args: argparse.Namespace) -> None:
             compact_pdf = compact_text(text)
             if not text.strip():
                 failures.append(f"no extractable text: {pdf_path.relative_to(project_root)}")
-            if compact_identity(str(discussion["team"])) not in compact_identity(text):
+            team = str(discussion["team"])
+            team_identity = compact_identity(team)
+            # Symbol-only names such as "^^" normalize to nothing; compare them verbatim.
+            pdf_identity = (
+                compact_pdf if team_identity == compact_text(team) else compact_identity(text)
+            )
+            if team_identity not in pdf_identity:
                 failures.append(f"team missing from PDF: {pdf_path.relative_to(project_root)}")
             if language == "ja" and not re.search(r"[ぁ-んァ-ヶ一-龯]", text):
                 failures.append(f"Japanese text missing: {pdf_path.relative_to(project_root)}")
