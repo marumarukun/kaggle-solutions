@@ -161,7 +161,7 @@ def run_kaggle_json(*args: str) -> tuple[object, str]:
     if result.returncode:
         detail = (result.stderr or result.stdout).strip()
         raise RuntimeError(f"Kaggle CLI failed: {detail}")
-    if result.stdout.strip() == "No topics found":
+    if result.stdout.strip().splitlines()[-1:] == ["No topics found"]:
         return [], result.stderr
     decoder = json.JSONDecoder()
     for match in re.finditer(r"(?m)^[\[{]", result.stdout):
